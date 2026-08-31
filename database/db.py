@@ -360,46 +360,114 @@ def get_fed_athlete_best(birth_year: int = None, gender: str = None) -> list:
 
 def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int = None, leg: str = None) -> list:
     """
-    Get athlete rankings with best points aggregated per athlete.
-    Returns one row per athlete with their best points across all events.
+    Get athlete rankings with full scoring logic: merge legs, compute top3_total + ranking_key.
+    Returns one row per athlete with: athlete_name, birth_year, gender, region, city, club,
+    all_events (dict), top3_total (Antalya/Edirne/Combined), ranking_key (tiebreaker tuple).
+
+    Note: leg parameter is ignored; always computes all three legs' scores for complete data.
     """
+    from collections import defaultdict
+    from federasyon.scorer import score_event, merge_scores, best_scores_sequence, compute_ranking_key
+
     conn = get_connection()
 
-    # Get best points per athlete across all events
-    query = """
-        SELECT
-            athlete_name, birth_year, gender, region, city, club,
-            MAX(best_points) as best_points,
-            best_leg
-        FROM fed_athlete_best
-        WHERE 1=1
-    """
+    # Fetch all fed_results (raw races) - always include all legs for complete scoring
+    query = "SELECT * FROM fed_results WHERE 1=1"
     params = []
 
     if birth_year:
         query += " AND birth_year = ?"
         params.append(birth_year)
-
     if gender:
         query += " AND gender = ?"
         params.append(gender)
-
     if region:
         query += " AND region = ?"
         params.append(region)
 
-    if leg:
-        query += " AND best_leg = ?"
-        params.append(leg)
-
-    query += " GROUP BY athlete_name, birth_year, gender ORDER BY best_points DESC"
-
     try:
         cursor = conn.execute(query, params)
         rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+        results = [dict(row) for row in rows]
     finally:
         conn.close()
+
+    # Group by athlete (athlete_name, birth_year, gender)
+    by_athlete = defaultdict(lambda: {
+        'antalya_races': [],
+        'edirne_races': [],
+        'region': 0,
+        'city': 'Unknown',
+        'club': 'Unknown',
+    })
+
+    for r in results:
+        key = (r['athlete_name'], r['birth_year'], r['gender'])
+        athlete_info = by_athlete[key]
+        athlete_info['region'] = r.get('region', 0)
+        athlete_info['city'] = r.get('city', 'Unknown')
+        athlete_info['club'] = r.get('club', 'Unknown')
+
+        if r['race_leg'] == 'antalya':
+            athlete_info['antalya_races'].append(r)
+        else:  # edirne
+            athlete_info['edirne_races'].append(r)
+
+    # Compute scores for each athlete
+    rankings = []
+
+    for (athlete_name, birth_year, gender), info in by_athlete.items():
+        # Score Antalya races
+        antalya_events: dict[tuple, int] = {}
+        for r in info['antalya_races']:
+            if r['time_seconds'] is not None:
+                try:
+                    pts = score_event(r['time_seconds'], birth_year, gender, r['stroke'], r['distance'])
+                    key = (r['stroke'], r['distance'])
+                    antalya_events[key] = max(antalya_events.get(key, 0), pts)
+                except:
+                    pass
+
+        # Score Edirne races
+        edirne_events: dict[tuple, int] = {}
+        for r in info['edirne_races']:
+            if r['time_seconds'] is not None:
+                try:
+                    pts = score_event(r['time_seconds'], birth_year, gender, r['stroke'], r['distance'])
+                    key = (r['stroke'], r['distance'])
+                    edirne_events[key] = max(edirne_events.get(key, 0), pts)
+                except:
+                    pass
+
+        # Compute top3_total for each leg
+        antalya_top3 = sum(best_scores_sequence(antalya_events)[:3]) if antalya_events else 0
+        edirne_top3 = sum(best_scores_sequence(edirne_events)[:3]) if edirne_events else 0
+
+        # Merge for combined
+        combined_events = merge_scores(antalya_events, edirne_events)
+        combined_top3 = sum(best_scores_sequence(combined_events)[:3]) if combined_events else 0
+        combined_key = compute_ranking_key(combined_events) if combined_events else ()
+
+        rankings.append({
+            'athlete_name': athlete_name,
+            'birth_year': birth_year,
+            'gender': gender,
+            'region': info['region'],
+            'city': info['city'],
+            'club': info['club'],
+            'antalya_events': antalya_events,
+            'edirne_events': edirne_events,
+            'combined_events': combined_events,
+            'antalya_top3': antalya_top3,
+            'edirne_top3': edirne_top3,
+            'combined_top3': combined_top3,
+            'ranking_key': combined_key,
+        })
+
+    # Sort by combined_top3 (descending) then by ranking_key (tiebreaker)
+    rankings.sort(key=lambda a: (-a['combined_top3'], a['ranking_key']))
+
+    return rankings
 
 
 def get_fed_results(race_leg: str = None) -> list:

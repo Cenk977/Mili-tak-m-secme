@@ -332,6 +332,115 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .athlete-detail {
+            margin-bottom: 20px;
+        }
+
+        .athlete-detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .athlete-detail-row strong {
+            color: #333;
+        }
+
+        .athlete-detail-row span {
+            color: #666;
+        }
+
+        .events-table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+        }
+
+        .events-table thead {
+            background: #f5f5f5;
+        }
+
+        .events-table th {
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .events-table td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .events-table tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .cursor-pointer {
+            cursor: pointer;
+            text-decoration: underline;
+            color: #667eea;
+        }
+
+        .cursor-pointer:hover {
+            color: #764ba2;
+        }
     </style>
 </head>
 <body>
@@ -410,6 +519,17 @@
                     <div class="empty">Yarışma sonuç dosyası yükleme işlemini başlayın</div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Athlete Detail Modal -->
+    <div class="modal" id="athleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Sporcu Detayları</h2>
+                <button class="modal-close" onclick="closeAthleteModal()">&times;</button>
+            </div>
+            <div id="modalBody"></div>
         </div>
     </div>
 
@@ -568,7 +688,7 @@
                     const region = athlete.region || 0;
                     const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
                     const gender = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kız' : '-';
-                    const score = athlete.best_points ? (athlete.best_points).toFixed(2) : '0.00';
+                    const score = athlete.display_top3 ? (athlete.display_top3).toString() : '0';
                     const selectionType = athlete.selection_type;
                     const selectionBadge = selectionType ?
                         `<span class="badge selection-${selectionType}">${selectionType}</span>` :
@@ -577,8 +697,8 @@
                         `<span class="badge region-${region}">Bölge ${region}</span>` :
                         '<span style="color: #999;">Bilinmiyor</span>';
 
-                    html += `<tr>
-                        <td>${name}</td>
+                    html += `<tr onclick="showAthleteDetail(${JSON.stringify(athlete).replace(/"/g, '&quot;')})">
+                        <td class="cursor-pointer"><strong>${name}</strong></td>
                         <td>${club}</td>
                         <td>${city}</td>
                         <td>${regionBadge}</td>
@@ -618,6 +738,66 @@
 
         // Load initial rankings (commented - wait for user filter)
         // loadRankings();
+
+        // Athlete detail modal
+        function showAthleteDetail(athlete) {
+            const modal = document.getElementById('athleteModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+
+            const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
+            const gender = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kız' : '-';
+            const regionName = ['Bilinmiyor', 'İstanbul', 'Marmara', 'Ege', 'İç Anadolu', 'Karadeniz', 'Güneydoğu'][athlete.region || 0];
+
+            modalTitle.textContent = athlete.athlete_name;
+
+            let html = '<div class="athlete-detail">';
+            html += '<div class="athlete-detail-row"><strong>Doğum Yılı:</strong><span>' + athlete.birth_year + '</span></div>';
+            html += '<div class="athlete-detail-row"><strong>Cinsiyet:</strong><span>' + gender + '</span></div>';
+            html += '<div class="athlete-detail-row"><strong>Bölge:</strong><span>' + regionName + '</span></div>';
+            html += '<div class="athlete-detail-row"><strong>Şehir:</strong><span>' + (athlete.city || 'Bilinmiyor') + '</span></div>';
+            html += '<div class="athlete-detail-row"><strong>Kulüp:</strong><span>' + (athlete.club || 'Bilinmiyor') + '</span></div>';
+            html += '</div>';
+
+            // Add scoring summary
+            html += '<div style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin-bottom: 20px;">';
+            html += '<div style="margin-bottom: 10px;"><strong>Puanlama Özeti</strong></div>';
+            html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 14px;">';
+            html += `<div><span style="color: #666;">Antalya Top3:</span> <strong>${athlete.antalya_top3}</strong></div>`;
+            html += `<div><span style="color: #666;">Edirne Top3:</span> <strong>${athlete.edirne_top3}</strong></div>`;
+            html += `<div><span style="color: #667eea;">Birleştirilmiş Top3:</span> <strong>${athlete.combined_top3}</strong></div>`;
+            html += '</div>';
+            html += '</div>';
+
+            // Add events tables
+            if (Object.keys(athlete.combined_events || {}).length > 0) {
+                html += '<div><strong style="display: block; margin-bottom: 10px;">Tüm Yarışmalar</strong>';
+                html += '<table class="events-table"><thead><tr><th>Stil</th><th>Mesafe</th><th>Puan</th></tr></thead><tbody>';
+
+                const events = athlete.combined_events || {};
+                Object.entries(events).sort((a, b) => b[1] - a[1]).forEach(([key, points]) => {
+                    const [stroke, distance] = JSON.parse(key);
+                    html += `<tr><td>${stroke}</td><td>${distance}m</td><td><strong>${points}</strong></td></tr>`;
+                });
+
+                html += '</tbody></table></div>';
+            }
+
+            modalBody.innerHTML = html;
+            modal.classList.add('show');
+        }
+
+        function closeAthleteModal() {
+            const modal = document.getElementById('athleteModal');
+            modal.classList.remove('show');
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('athleteModal').addEventListener('click', (e) => {
+            if (e.target.id === 'athleteModal') {
+                closeAthleteModal();
+            }
+        });
     </script>
 </body>
 </html>

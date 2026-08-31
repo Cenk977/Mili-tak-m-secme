@@ -142,6 +142,7 @@ def compute_and_save_best_scores(race_leg: str = 'antalya') -> int:
 def compute_selection_status(athletes: list) -> dict:
     """
     Compute selection status for athletes: TR, BÖLGE, or None.
+    Uses combined_top3 + ranking_key for ranking (no minimum points baraj).
     Returns dict: {athlete_key: selection_type}
     """
     from collections import defaultdict
@@ -151,41 +152,44 @@ def compute_selection_status(athletes: list) -> dict:
     # Group by birth_year and region
     by_year_region = defaultdict(list)
     for athlete in athletes:
-        if athlete.get('best_points', 0) <= 0:
+        if athlete.get('combined_top3', 0) <= 0:
             continue  # Skip athletes with no valid score
 
         key = (athlete['birth_year'], athlete.get('region', 0))
         by_year_region[key].append(athlete)
 
-    # For each year+region, rank by points and assign selection
+    # For each year+region, rank by combined_top3 + ranking_key
     for (birth_year, region), group in by_year_region.items():
         if birth_year not in SELECTION_QUOTAS:
             continue
 
         quota = SELECTION_QUOTAS[birth_year]
-        min_points = quota.get('min_points', 7)
 
-        # Sort by points descending
-        ranked = sorted(group, key=lambda a: a.get('best_points', 0), reverse=True)
+        # Sort by combined_top3 (desc) then ranking_key (tiebreaker)
+        ranked = sorted(group, key=lambda a: (-a.get('combined_top3', 0), a.get('ranking_key', ())))
 
         for idx, athlete in enumerate(ranked):
             athlete_key = (athlete['athlete_name'], athlete['birth_year'], athlete['gender'])
-            points = athlete.get('best_points', 0)
+            top3 = athlete.get('combined_top3', 0)
 
-            # Below minimum threshold
-            if points < min_points:
+            # Skip athletes with 0 score
+            if top3 <= 0:
                 selections[athlete_key] = None
                 continue
 
-            # TR selection (national team)
+            # Determine region-based bölge limit
             if region == 1:
-                tr_limit = quota.get('region_1', 3)
+                bölge_limit = quota.get('region_1', 3)
             else:
-                tr_limit = quota.get('region_other', 2)
+                bölge_limit = quota.get('region_other', 2)
 
-            if idx < quota.get('tr', 8):
+            tr_count = quota.get('tr', 8)
+
+            # TR selection (national team)
+            if idx < tr_count:
                 selections[athlete_key] = 'TR'
-            elif idx < tr_limit + quota.get('tr', 8):
+            # BÖLGE selection (regional)
+            elif idx < tr_count + bölge_limit:
                 selections[athlete_key] = 'BÖLGE'
             else:
                 selections[athlete_key] = None
@@ -403,28 +407,49 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     pass
 
-            # Get athlete rankings with aggregated best points
-            leg_param = None if leg == 'combined' else leg
-            athletes = get_athlete_rankings(birth_year, gender, region, leg_param)
+            # Get athlete rankings with full scoring (all legs computed)
+            athletes = get_athlete_rankings(birth_year, gender, region)
 
-            # Compute selection status
+            # Compute selection status based on combined scoring
             selections = compute_selection_status(athletes)
 
-            # Add selection_type to each athlete
+            # Transform to API response format
+            response_athletes = []
             for athlete in athletes:
                 athlete_key = (athlete['athlete_name'], athlete['birth_year'], athlete['gender'])
-                athlete['selection_type'] = selections.get(athlete_key)
+
+                # Determine which top3 to display based on leg selection
+                if leg == 'antalya':
+                    display_top3 = athlete['antalya_top3']
+                elif leg == 'edirne':
+                    display_top3 = athlete['edirne_top3']
+                else:  # combined
+                    display_top3 = athlete['combined_top3']
+
+                response_athletes.append({
+                    'athlete_name': athlete['athlete_name'],
+                    'birth_year': athlete['birth_year'],
+                    'gender': athlete['gender'],
+                    'region': athlete['region'],
+                    'city': athlete['city'],
+                    'club': athlete['club'],
+                    'antalya_top3': athlete['antalya_top3'],
+                    'edirne_top3': athlete['edirne_top3'],
+                    'combined_top3': athlete['combined_top3'],
+                    'display_top3': display_top3,
+                    'selection_type': selections.get(athlete_key),
+                })
 
             # Send JSON response
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
 
-            response_json = json.dumps(athletes, ensure_ascii=False, indent=2)
+            response_json = json.dumps(response_athletes, ensure_ascii=False, indent=2)
             self.wfile.write(response_json.encode('utf-8'))
 
         except Exception as e:
-            logger.error(f"Error in /api/ranking: {e}")
+            logger.error(f"Error in /api/ranking: {e}", exc_info=True)
             self.send_error(500, str(e))
 
     def handle_clear(self):
