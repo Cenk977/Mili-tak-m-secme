@@ -1,0 +1,4 @@
+openpyxl==3.10.10
+pandas==2.0.3
+requests==2.31.0
+sqlite3-python==1.0.0
