@@ -98,7 +98,6 @@ def init_db():
     # Federation scoring: best per event (materialized from fed_results)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS fed_athlete_best (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
             athlete_name TEXT NOT NULL,
             birth_year INTEGER NOT NULL,
             gender TEXT NOT NULL,
