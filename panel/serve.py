@@ -426,11 +426,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 else:  # combined
                     display_top3 = athlete['combined_top3']
 
-                # Convert events dict: tuples → JSON arrays
-                combined_events_json = {}
-                for (stroke, distance), points in athlete['combined_events'].items():
-                    key = json.dumps([stroke, distance])  # [stroke, distance] as JSON string
-                    combined_events_json[key] = points
+                # Convert events dicts: tuples → JSON arrays
+                def events_to_json(events_dict):
+                    result = {}
+                    for (stroke, distance), points in events_dict.items():
+                        key = json.dumps([stroke, distance])
+                        result[key] = points
+                    return result
+
+                antalya_events_json = events_to_json(athlete['antalya_events'])
+                edirne_events_json = events_to_json(athlete['edirne_events'])
+                combined_events_json = events_to_json(athlete['combined_events'])
 
                 response_athletes.append({
                     'athlete_name': athlete['athlete_name'],
@@ -443,6 +449,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'edirne_top3': athlete['edirne_top3'],
                     'combined_top3': athlete['combined_top3'],
                     'display_top3': display_top3,
+                    'antalya_events': antalya_events_json,
+                    'edirne_events': edirne_events_json,
                     'combined_events': combined_events_json,
                     'selection_type': selections.get(athlete_key),
                 })

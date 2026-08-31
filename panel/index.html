@@ -346,32 +346,34 @@
 
         .modal.show {
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
         }
 
         .modal-content {
             background: white;
-            padding: 30px;
-            border-radius: 12px;
-            max-width: 800px;
-            max-height: 80vh;
+            padding: 20px;
+            border-radius: 12px 12px 0 0;
+            width: 100%;
+            max-width: 600px;
+            max-height: 60vh;
             overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.3);
         }
 
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #eee;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
         }
 
         .modal-header h2 {
             margin: 0;
-            font-size: 20px;
+            font-size: 16px;
+            font-weight: 600;
             color: #333;
         }
 
@@ -388,44 +390,50 @@
         }
 
         .athlete-detail {
-            margin-bottom: 20px;
+            margin-bottom: 12px;
+            font-size: 13px;
         }
 
         .athlete-detail-row {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
         }
 
         .athlete-detail-row strong {
             color: #333;
+            font-size: 13px;
         }
 
         .athlete-detail-row span {
             color: #666;
+            font-size: 13px;
         }
 
         .events-table {
             width: 100%;
-            margin-top: 15px;
+            margin-top: 10px;
             border-collapse: collapse;
+            font-size: 12px;
         }
 
         .events-table thead {
-            background: #f5f5f5;
+            background: #f9f9f9;
         }
 
         .events-table th {
-            padding: 10px;
+            padding: 6px 8px;
             text-align: left;
             font-weight: 600;
-            border-bottom: 2px solid #ddd;
+            font-size: 12px;
+            border-bottom: 1px solid #ddd;
         }
 
         .events-table td {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
+            padding: 6px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 12px;
         }
 
         .events-table tbody tr:hover {
@@ -752,35 +760,38 @@
             modalTitle.textContent = athlete.athlete_name;
 
             let html = '<div class="athlete-detail">';
-            html += '<div class="athlete-detail-row"><strong>Doğum Yılı:</strong><span>' + athlete.birth_year + '</span></div>';
+            html += '<div class="athlete-detail-row"><strong>Yaş:</strong><span>' + age + '</span></div>';
             html += '<div class="athlete-detail-row"><strong>Cinsiyet:</strong><span>' + gender + '</span></div>';
             html += '<div class="athlete-detail-row"><strong>Bölge:</strong><span>' + regionName + '</span></div>';
-            html += '<div class="athlete-detail-row"><strong>Şehir:</strong><span>' + (athlete.city || 'Bilinmiyor') + '</span></div>';
-            html += '<div class="athlete-detail-row"><strong>Kulüp:</strong><span>' + (athlete.club || 'Bilinmiyor') + '</span></div>';
+            html += '<div class="athlete-detail-row"><strong>Şehir:</strong><span>' + (athlete.city || '-') + '</span></div>';
+            html += '<div class="athlete-detail-row"><strong>Kulüp:</strong><span>' + (athlete.club || '-') + '</span></div>';
             html += '</div>';
 
-            // Add scoring summary
-            html += '<div style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin-bottom: 20px;">';
-            html += '<div style="margin-bottom: 10px;"><strong>Puanlama Özeti</strong></div>';
-            html += '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 14px;">';
-            html += `<div><span style="color: #666;">Antalya Top3:</span> <strong>${athlete.antalya_top3}</strong></div>`;
-            html += `<div><span style="color: #666;">Edirne Top3:</span> <strong>${athlete.edirne_top3}</strong></div>`;
-            html += `<div><span style="color: #667eea;">Birleştirilmiş Top3:</span> <strong>${athlete.combined_top3}</strong></div>`;
-            html += '</div>';
-            html += '</div>';
+            // Determine which events to show based on current leg selection
+            let displayEvents = athlete.combined_events;
+            let displayTitle = 'Tüm Yarışmalar (Birleştirilmiş)';
 
-            // Add events tables
-            if (Object.keys(athlete.combined_events || {}).length > 0) {
-                html += '<div><strong style="display: block; margin-bottom: 10px;">Tüm Yarışmalar</strong>';
+            if (currentLeg === 'antalya') {
+                displayEvents = athlete.antalya_events || {};
+                displayTitle = 'Antalya Yarışmaları';
+            } else if (currentLeg === 'edirne') {
+                displayEvents = athlete.edirne_events || {};
+                displayTitle = 'Edirne Yarışmaları';
+            }
+
+            // Add events table for current leg
+            if (Object.keys(displayEvents).length > 0) {
+                html += '<div><strong style="display: block; margin-bottom: 8px; font-size: 13px;">' + displayTitle + '</strong>';
                 html += '<table class="events-table"><thead><tr><th>Stil</th><th>Mesafe</th><th>Puan</th></tr></thead><tbody>';
 
-                const events = athlete.combined_events || {};
-                Object.entries(events).sort((a, b) => b[1] - a[1]).forEach(([key, points]) => {
+                Object.entries(displayEvents).sort((a, b) => b[1] - a[1]).forEach(([key, points]) => {
                     const [stroke, distance] = JSON.parse(key);
                     html += `<tr><td>${stroke}</td><td>${distance}m</td><td><strong>${points}</strong></td></tr>`;
                 });
 
                 html += '</tbody></table></div>';
+            } else {
+                html += '<div style="color: #999; font-size: 12px; margin-top: 10px;">Bu etapta yarışma kaydı yok</div>';
             }
 
             modalBody.innerHTML = html;

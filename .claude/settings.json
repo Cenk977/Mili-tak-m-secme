@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(dir)",
-      "Read(//c/Users/PC/OneDrive - TED BURSA KOLEJ�/Masa�st�/**)"
+      "Read(//c/Users/PC/OneDrive - TED BURSA KOLEJ�/Masa�st�/**)",
+      "Bash(python3)",
+      "Bash(python3 -c \"from config import DB_PATH; print\\(f'DB Path: {DB_PATH}'\\)\")"
     ]
   }
 }
