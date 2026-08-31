@@ -11,6 +11,7 @@ from database.db import (
     insert_fed_result,
     insert_fed_athlete_best,
     get_fed_athlete_best,
+    get_athlete_rankings,
     get_fed_results,
     clear_fed_tables,
 )

@@ -358,6 +358,50 @@ def get_fed_athlete_best(birth_year: int = None, gender: str = None) -> list:
         conn.close()
 
 
+def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int = None, leg: str = None) -> list:
+    """
+    Get athlete rankings with best points aggregated per athlete.
+    Returns one row per athlete with their best points across all events.
+    """
+    conn = get_connection()
+
+    # Get best points per athlete across all events
+    query = """
+        SELECT
+            athlete_name, birth_year, gender, region, city, club,
+            MAX(best_points) as best_points,
+            best_leg
+        FROM fed_athlete_best
+        WHERE 1=1
+    """
+    params = []
+
+    if birth_year:
+        query += " AND birth_year = ?"
+        params.append(birth_year)
+
+    if gender:
+        query += " AND gender = ?"
+        params.append(gender)
+
+    if region:
+        query += " AND region = ?"
+        params.append(region)
+
+    if leg:
+        query += " AND best_leg = ?"
+        params.append(leg)
+
+    query += " GROUP BY athlete_name, birth_year, gender ORDER BY best_points DESC"
+
+    try:
+        cursor = conn.execute(query, params)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
 def get_fed_results(race_leg: str = None) -> list:
     """Get fed_results, optionally filtered by race_leg."""
     conn = get_connection()

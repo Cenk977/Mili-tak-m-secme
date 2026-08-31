@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from database import (
     init_db, insert_athlete, insert_result, get_athletes_by_filter, clear_athletes,
     get_missing_clubs_from_db, insert_fed_result, insert_fed_athlete_best, get_fed_athlete_best,
-    get_fed_results, clear_fed_tables
+    get_athlete_rankings, get_fed_results, clear_fed_tables
 )
 from modules.lxf_parser import parse_lxf_file, get_birth_year
 from modules.m1_normalize import normalize_for_lookup
@@ -137,6 +137,60 @@ def compute_and_save_best_scores(race_leg: str = 'antalya') -> int:
 
     logger.info(f"Saved {saved_count} best scores to fed_athlete_best")
     return saved_count
+
+
+def compute_selection_status(athletes: list) -> dict:
+    """
+    Compute selection status for athletes: TR, BÖLGE, or None.
+    Returns dict: {athlete_key: selection_type}
+    """
+    from collections import defaultdict
+
+    selections = {}
+
+    # Group by birth_year and region
+    by_year_region = defaultdict(list)
+    for athlete in athletes:
+        if athlete.get('best_points', 0) <= 0:
+            continue  # Skip athletes with no valid score
+
+        key = (athlete['birth_year'], athlete.get('region', 0))
+        by_year_region[key].append(athlete)
+
+    # For each year+region, rank by points and assign selection
+    for (birth_year, region), group in by_year_region.items():
+        if birth_year not in SELECTION_QUOTAS:
+            continue
+
+        quota = SELECTION_QUOTAS[birth_year]
+        min_points = quota.get('min_points', 7)
+
+        # Sort by points descending
+        ranked = sorted(group, key=lambda a: a.get('best_points', 0), reverse=True)
+
+        for idx, athlete in enumerate(ranked):
+            athlete_key = (athlete['athlete_name'], athlete['birth_year'], athlete['gender'])
+            points = athlete.get('best_points', 0)
+
+            # Below minimum threshold
+            if points < min_points:
+                selections[athlete_key] = None
+                continue
+
+            # TR selection (national team)
+            if region == 1:
+                tr_limit = quota.get('region_1', 3)
+            else:
+                tr_limit = quota.get('region_other', 2)
+
+            if idx < quota.get('tr', 8):
+                selections[athlete_key] = 'TR'
+            elif idx < tr_limit + quota.get('tr', 8):
+                selections[athlete_key] = 'BÖLGE'
+            else:
+                selections[athlete_key] = None
+
+    return selections
 
 
 def normalize_athlete_data(athlete: dict, result: dict, overrides: dict) -> tuple:
@@ -331,6 +385,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             birth_year = None
             gender = None
+            region = None
+            leg = params.get('leg', ['combined'])[0]
 
             if 'birth_year' in params:
                 try:
@@ -341,8 +397,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if 'gender' in params:
                 gender = params['gender'][0] if params['gender'][0] else None
 
-            # Get fed_athlete_best
-            athletes = get_fed_athlete_best(birth_year, gender)
+            if 'region' in params:
+                try:
+                    region = int(params['region'][0])
+                except ValueError:
+                    pass
+
+            # Get athlete rankings with aggregated best points
+            leg_param = None if leg == 'combined' else leg
+            athletes = get_athlete_rankings(birth_year, gender, region, leg_param)
+
+            # Compute selection status
+            selections = compute_selection_status(athletes)
+
+            # Add selection_type to each athlete
+            for athlete in athletes:
+                athlete_key = (athlete['athlete_name'], athlete['birth_year'], athlete['gender'])
+                athlete['selection_type'] = selections.get(athlete_key)
 
             # Send JSON response
             self.send_response(200)

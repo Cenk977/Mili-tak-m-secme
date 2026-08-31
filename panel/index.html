@@ -265,16 +265,17 @@
         .selection-TR {
             background: #fff59d;
             color: #f57f17;
+            font-weight: 600;
         }
 
-        .selection-B1 {
-            background: #e1bee7;
-            color: #6a1b9a;
-        }
-
-        .selection-Bölge {
+        .selection-BÖLGE {
             background: #b2dfdb;
             color: #00695c;
+            font-weight: 600;
+        }
+
+        .selection-null {
+            color: #999;
         }
 
         .empty {
@@ -352,6 +353,18 @@
                 <div id="uploadStatus" class="status"></div>
             </div>
 
+            <!-- Leg Selection -->
+            <div class="section">
+                <div class="section-title">Yarışma Etabı</div>
+                <div class="filters">
+                    <div class="filter-group">
+                        <button class="btn btn-primary" data-leg="combined" onclick="setLeg(this)">Birleştirilmiş</button>
+                        <button class="btn" data-leg="antalya" onclick="setLeg(this)">Antalya</button>
+                        <button class="btn" data-leg="edirne" onclick="setLeg(this)">Edirne</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Filters & Actions -->
             <div class="section">
                 <div class="section-title">Filtreler</div>
@@ -366,6 +379,18 @@
                             <option value="">Tümü</option>
                             <option value="M">Erkek</option>
                             <option value="F">Kız</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="region">Bölge:</label>
+                        <select id="region">
+                            <option value="">Tümü</option>
+                            <option value="1">İstanbul</option>
+                            <option value="2">Marmara</option>
+                            <option value="3">Ege</option>
+                            <option value="4">İç Anadolu</option>
+                            <option value="5">Karadeniz</option>
+                            <option value="6">Güneydoğu</option>
                         </select>
                     </div>
                     <button class="btn btn-primary" onclick="loadRankings()">Filtrele</button>
@@ -389,6 +414,25 @@
     </div>
 
     <script>
+        // Leg selection state
+        let currentLeg = 'combined';
+
+        // Set leg selection
+        function setLeg(btn) {
+            const leg = btn.getAttribute('data-leg');
+            currentLeg = leg;
+
+            // Update button styles
+            document.querySelectorAll('[data-leg]').forEach(b => {
+                b.classList.remove('btn-primary');
+                b.classList.add('btn');
+            });
+            btn.classList.remove('btn');
+            btn.classList.add('btn-primary');
+
+            loadRankings();
+        }
+
         // Upload handling
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
@@ -456,10 +500,13 @@
         async function loadRankings() {
             const birthYear = document.getElementById('birthYear').value || null;
             const gender = document.getElementById('gender').value || null;
+            const region = document.getElementById('region').value || null;
 
             const params = new URLSearchParams();
+            params.append('leg', currentLeg);
             if (birthYear) params.append('birth_year', birthYear);
             if (gender) params.append('gender', gender);
+            if (region) params.append('region', region);
 
             const url = `/api/ranking${params.toString() ? '?' + params.toString() : ''}`;
 
@@ -515,15 +562,16 @@
                     '</tr></thead><tbody>';
 
                 athletes.forEach(athlete => {
-                    const name = `${athlete.firstname || ''} ${athlete.lastname || ''}`.trim() || 'Bilinmiyor';
-                    const club = athlete.club_name || 'Bilinmiyor';
+                    const name = athlete.athlete_name || 'Bilinmiyor';
+                    const club = athlete.club || 'Bilinmiyor';
                     const city = athlete.city || 'Bilinmiyor';
                     const region = athlete.region || 0;
                     const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
                     const gender = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kız' : '-';
-                    const score = (athlete.best_score || 0).toFixed(2);
-                    const selectionBadge = athlete.selection_type ?
-                        `<span class="badge selection-${athlete.selection_type}">${athlete.selection_type}</span>` :
+                    const score = athlete.best_points ? (athlete.best_points).toFixed(2) : '0.00';
+                    const selectionType = athlete.selection_type;
+                    const selectionBadge = selectionType ?
+                        `<span class="badge selection-${selectionType}">${selectionType}</span>` :
                         '<span style="color: #999;">-</span>';
                     const regionBadge = region ?
                         `<span class="badge region-${region}">Bölge ${region}</span>` :
