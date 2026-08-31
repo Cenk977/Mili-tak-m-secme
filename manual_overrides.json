@@ -1,0 +1,195 @@
+{
+  "_aciklama": "Bu dosyayı GitHub'dan telefonla düzenleyebilir veya Admin Panel'den otomatik kaydedebilirsiniz.",
+  "_kullanim": "club_aliases: yeni kulüp bölge eşleştirmesi. name_overrides: aynı isimli farklı kulüplü sporcuların birleştirilmesi.",
+
+  "club_aliases": [
+    {
+      "_ornek": "Aşağıdaki satırı kopyalayıp doldurun — bu _ornek satırını silmeyin",
+      "raw": "ÖRNEK KULÜP ADI (yarışta göründüğü gibi)",
+      "canonical": "Doğru Kulüp Adı",
+      "city": "Şehir",
+      "region": 1
+    },
+    {
+      "_aciklama": "Edirne'de görülen yeni kulüpler (ProgressionDetails.pdf, 16.04.2026)",
+      "raw": "Afyonkarahisar Maraşal Gençlik Spor Kulübü",
+      "canonical": "Afyonkarahisar Maraşal Gençlik Spor Kulübü",
+      "city": "Afyonkarahisar",
+      "region": 3
+    },
+    {
+      "raw": "Erciyes Yıldız Spor Kulübü",
+      "canonical": "Erciyes Yıldız Spor Kulübü",
+      "city": "Kayseri",
+      "region": 4
+    },
+    {
+      "raw": "Manisa Gençlik Ve Spor IL Müdürlüğü Spor Kulübü",
+      "canonical": "Manisa Gençlik Ve Spor Il Müdürlüğü Spor Kulübü",
+      "city": "Manisa",
+      "region": 3
+    },
+    {
+      "raw": "Sinop Gençlik Ve Spor IL Müdürlüğü Spor Kulübü",
+      "canonical": "Sinop Gençlik Ve Spor Il Müdürlüğü Spor Kulübü",
+      "city": "Sinop",
+      "region": 5
+    },
+    {
+      "raw": "Karabük Gençlik Ve Spor IL Müdürlüğü Spor Kulübü",
+      "canonical": "Karabük Gençlik Ve Spor Il Müdürlüğü Spor Kulübü",
+      "city": "Karabük",
+      "region": 4
+    },
+    {
+      "raw": "Karadenizsu Sporları Spor Kulübü",
+      "canonical": "Karadenizsu Sporları Spor Kulübü",
+      "city": "Ordu",
+      "region": 5
+    },
+    {
+      "_aciklama": "Ferdi sporcular için şehir/bölge eşleştirmesi",
+      "raw": "Bursa Ferdi",
+      "canonical": "Bursa Ferdi",
+      "city": "Bursa",
+      "region": 2
+    },
+    {
+      "raw": "İzmir Ferdi",
+      "canonical": "İzmir Ferdi",
+      "city": "İzmir",
+      "region": 3
+    },
+    {
+      "raw": "İstanbul Ferdi",
+      "canonical": "İstanbul Ferdi",
+      "city": "İstanbul",
+      "region": 1
+    },
+    {
+      "raw": "Gaziantep Ferdi",
+      "canonical": "Gaziantep Ferdi",
+      "city": "Gaziantep",
+      "region": 6
+    },
+    {
+      "raw": "Ankara Ferdi",
+      "canonical": "Ankara Ferdi",
+      "city": "Ankara",
+      "region": 4
+    }
+  ],
+
+  "name_overrides": [
+    {
+      "_ornek": "Aynı isimli farklı kulüplü sporcu örneği — bu satırı silmeyin",
+      "name": "Örnek Sporcu",
+      "birth_year": 2013,
+      "gender": "F",
+      "resolution": "same",
+      "canonical_club": "Doğru Kulüp",
+      "canonical_city": "Şehir",
+      "canonical_region": 1
+    },
+    {
+      "_aciklama": "Efe ÖZER 2011: Antalya'da İstanbul Ferdi, Edirne'de Beylikdüzü — aynı sporcu",
+      "name": "Efe ÖZER",
+      "birth_year": 2011,
+      "gender": "M",
+      "resolution": "same",
+      "canonical_club": "Beylikdüzü Yüzme Spor Kulübü",
+      "canonical_city": "İstanbul",
+      "canonical_region": 1
+    },
+    {
+      "_aciklama": "Zeynep Kaya 2013: Antalya Ted Ankara, Edirne Ferdi — Ankara Ferdi olarak birleştirildi",
+      "name": "Zeynep Kaya",
+      "birth_year": 2013,
+      "gender": "F",
+      "resolution": "same",
+      "canonical_club": "Ankara Ferdi",
+      "canonical_city": "Ankara",
+      "canonical_region": 4
+    },
+    {
+      "_aciklama": "İsmail Haki ÇAKAR varyantları: Ismail Hâki ÇAKAR = İsmail Hâki ÇAKAR = Ismail Haki ÇAKAR = İsmail Haki ÇAKAR",
+      "_variants": ["Ismail Hâki ÇAKAR", "İsmail Hâki ÇAKAR", "Ismail Haki ÇAKAR"],
+      "name": "İsmail Haki ÇAKAR",
+      "birth_year": 2013,
+      "gender": "M",
+      "resolution": "same",
+      "canonical_name": "İsmail Haki Çakar",
+      "canonical_club": "Sivas Spor Kulübü",
+      "canonical_city": "Sivas",
+      "canonical_region": 4
+    },
+    {
+      "_aciklama": "ırmak Ilke ÖZBAY varyantları: ırmak Ilke ÖZBAY = Irmak İlke Özbay = Irmak Ilke ÖZBAY",
+      "_variants": ["ırmak Ilke ÖZBAY", "Irmak Ilke ÖZBAY"],
+      "name": "Irmak İlke ÖZBAY",
+      "birth_year": 2013,
+      "gender": "F",
+      "resolution": "same",
+      "canonical_name": "Irmak İlke Özbay",
+      "canonical_club": "Tokat Gaziosmanpaşa Yüzme Spor Kulübü",
+      "canonical_city": "Tokat",
+      "canonical_region": 4
+    },
+    {
+      "_aciklama": "İdil Derin Arslan: IDIL Derin ARSLAN = Idil Derin Arslan = İdil Derin Arslan",
+      "_variants": ["IDIL Derin ARSLAN", "Idil Derin Arslan"],
+      "name": "İdil Derin ARSLAN",
+      "birth_year": 2012,
+      "gender": "F",
+      "resolution": "same",
+      "canonical_name": "İdil Derin Arslan",
+      "canonical_club": "Galatasaray Spor Kulübü",
+      "canonical_city": "İstanbul",
+      "canonical_region": 1
+    },
+    {
+      "_aciklama": "Zafer Ege İzmirli: Zafer Ege Izmirli = Zafer Ege IZMİRLİ = Zafer Ege İzmirli",
+      "_variants": ["Zafer Ege Izmirli", "Zafer Ege IZMİRLİ"],
+      "name": "Zafer Ege İzmirli",
+      "birth_year": 2013,
+      "gender": "M",
+      "resolution": "same",
+      "canonical_name": "Zafer Ege İzmirli",
+      "canonical_club": "Edirne Yüzme Eğitim Merkezi Spor Kulübü",
+      "canonical_city": "Edirne",
+      "canonical_region": 2
+    },
+    {
+      "_aciklama": "Poyraz Baş 2013: Edirne'de Ferdi olarak geliyor, İstanbul kayıtlı",
+      "name": "Poyraz BAŞ",
+      "birth_year": 2013,
+      "gender": "M",
+      "resolution": "same",
+      "canonical_name": "Poyraz Baş",
+      "canonical_club": "İstanbul Ferdi",
+      "canonical_city": "İstanbul",
+      "canonical_region": 1
+    }
+    ,{
+      "_aciklama": "Naz Hazirolan: PDF'te noktasiz i ile geliyor, Hazirolan = Hazirolan",
+      "name": "Naz Hazirolan",
+      "birth_year": 2013,
+      "gender": "F",
+      "resolution": "same",
+      "canonical_name": "Naz Hazırolan",
+      "canonical_club": "Vamos Spor Kulübü",
+      "canonical_city": "Ankara",
+      "canonical_region": 4
+    }
+    ,{
+      "name": "Ahmet Tuna Atci",
+      "birth_year": 2013,
+      "gender": "M",
+      "resolution": "same",
+      "canonical_name": "Ahmet Tuna Atcı",
+      "canonical_club": "Nesibe Aydın Spor Kulübü",
+      "canonical_city": "Ankara",
+      "canonical_region": 4
+    }
+  ]
+}

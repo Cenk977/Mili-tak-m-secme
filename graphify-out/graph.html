@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>graphify - graphify-out/graph.html</title>
+<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"
+        integrity="sha384-Ux6phic9PEHJ38YtrijhkzyJ8yQlH8i/+buBR8s3mAZOJrP1gwyvAcIYl3GWtpX1"
+        crossorigin="anonymous"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
+  #graph { flex: 1; }
+  #sidebar { width: 280px; background: #1a1a2e; border-left: 1px solid #2a2a4e; display: flex; flex-direction: column; overflow: hidden; }
+  #search-wrap { padding: 12px; border-bottom: 1px solid #2a2a4e; }
+  #search { width: 100%; background: #0f0f1a; border: 1px solid #3a3a5e; color: #e0e0e0; padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
+  #search:focus { border-color: #4E79A7; }
+  #search-results { max-height: 140px; overflow-y: auto; padding: 4px 12px; border-bottom: 1px solid #2a2a4e; display: none; }
+  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-item:hover { background: #2a2a4e; }
+  #info-panel { padding: 14px; border-bottom: 1px solid #2a2a4e; min-height: 140px; }
+  #info-panel h3 { font-size: 13px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #info-content { font-size: 13px; color: #ccc; line-height: 1.6; }
+  #info-content .field { margin-bottom: 5px; }
+  #info-content .field b { color: #e0e0e0; }
+  #info-content .empty { color: #555; font-style: italic; }
+  .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid #333; }
+  .neighbor-link:hover { background: #2a2a4e; }
+  #neighbors-list { max-height: 160px; overflow-y: auto; margin-top: 4px; }
+  #legend-wrap { flex: 1; overflow-y: auto; padding: 12px; }
+  #legend-wrap h3 { font-size: 13px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  .legend-item:hover { background: #2a2a4e; padding-left: 4px; }
+  .legend-item.dimmed { opacity: 0.35; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-count { color: #666; font-size: 11px; }
+  #stats { padding: 10px 14px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #555; }
+  #legend-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 0; }
+  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; }
+  #legend-controls label:hover { color: #e0e0e0; }
+  .legend-cb, #select-all-cb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #3a3a5e; border-radius: 3px; background: #0f0f1a; cursor: pointer; position: relative; flex-shrink: 0; }
+  .legend-cb:checked, #select-all-cb:checked { background: #4E79A7; border-color: #4E79A7; }
+  .legend-cb:checked::after, #select-all-cb:checked::after { content: ''; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  #select-all-cb:indeterminate { background: #4E79A7; border-color: #4E79A7; }
+  #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; border: none; transform: none; }
+</style>
+</head>
+<body>
+<div id="graph"></div>
+<div id="sidebar">
+  <div id="search-wrap">
+    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
+    <div id="search-results"></div>
+  </div>
+  <div id="info-panel">
+    <h3>Node Info</h3>
+    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
+  </div>
+  <div id="legend-wrap">
+    <h3>Communities</h3>
+    <div id="legend-controls">
+      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select All</label>
+    </div>
+    <div id="legend"></div>
+  </div>
+  <div id="stats">67 nodes &middot; 114 edges &middot; 12 communities</div>
+</div>
+<script>
+const RAW_NODES = [{"id": "panel_serve_dashboardhandler", "label": "DashboardHandler", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 33.1, "font": {"size": 12, "color": "#ffffff"}, "title": "DashboardHandler", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "code", "degree": 10}, {"id": "modules_m4_mapping_clubinfo", "label": "ClubInfo", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 16.9, "font": {"size": 12, "color": "#ffffff"}, "title": "ClubInfo", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "code", "degree": 3}, {"id": "panel_serve_dashboardhandler_do_get", "label": ".do_GET()", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.9, "font": {"size": 12, "color": "#ffffff"}, "title": ".do_GET()", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "code", "degree": 3}, {"id": "panel_serve_dashboardhandler_do_post", "label": ".do_POST()", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 19.2, "font": {"size": 12, "color": "#ffffff"}, "title": ".do_POST()", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "code", "degree": 4}, {"id": "panel_serve_dashboardhandler_handle_clear", "label": ".handle_clear()", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 19.2, "font": {"size": 12, "color": "#ffffff"}, "title": ".handle_clear()", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "code", "degree": 4}, {"id": "panel_serve_dashboardhandler_handle_upload", "label": ".handle_upload()", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.9, "font": {"size": 12, "color": "#ffffff"}, "title": ".handle_upload()", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "code", "degree": 3}, {"id": "panel_serve_dashboardhandler_log_message", "label": ".log_message()", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 14.6, "font": {"size": 12, "color": "#ffffff"}, "title": ".log_message()", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "code", "degree": 2}, {"id": "panel_serve_dashboardhandler_serve_api_ranking", "label": ".serve_api_ranking()", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 19.2, "font": {"size": 12, "color": "#ffffff"}, "title": ".serve_api_ranking()", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "code", "degree": 4}, {"id": "panel_serve_dashboardhandler_serve_index", "label": ".serve_index()", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.9, "font": {"size": 12, "color": "#ffffff"}, "title": ".serve_index()", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "code", "degree": 3}, {"id": "modules_lxf_parser_get_birth_year", "label": "get_birth_year()", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 23.8, "font": {"size": 12, "color": "#ffffff"}, "title": "get_birth_year()", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "code", "degree": 6}, {"id": "modules_lxf_parser_map_stroke_name", "label": "map_stroke_name()", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 19.2, "font": {"size": 12, "color": "#ffffff"}, "title": "map_stroke_name()", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "code", "degree": 4}, {"id": "modules_lxf_parser_parse_lxf_file", "label": "parse_lxf_file()", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 28.5, "font": {"size": 12, "color": "#ffffff"}, "title": "parse_lxf_file()", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "code", "degree": 8}, {"id": "modules_lxf_parser_parse_swimtime", "label": "parse_swimtime()", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.9, "font": {"size": 12, "color": "#ffffff"}, "title": "parse_swimtime()", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "code", "degree": 3}, {"id": "panel_serve_process_lxf_upload", "label": "process_lxf_upload()", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 28.5, "font": {"size": 12, "color": "#ffffff"}, "title": "process_lxf_upload()", "community": 1, "community_name": "lxf_parser.py", "source_file": "panel/serve.py", "file_type": "code", "degree": 8}, {"id": "test_lxf_data_main", "label": "main()", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 19.2, "font": {"size": 12, "color": "#ffffff"}, "title": "main()", "community": 1, "community_name": "lxf_parser.py", "source_file": "test_lxf_data.py", "file_type": "code", "degree": 4}, {"id": "modules_m4_mapping_get_missing_clubs", "label": "get_missing_clubs()", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 16.9, "font": {"size": 12, "color": "#ffffff"}, "title": "get_missing_clubs()", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "code", "degree": 3}, {"id": "modules_m4_mapping_load_mapping", "label": "load_mapping()", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 16.9, "font": {"size": 12, "color": "#ffffff"}, "title": "load_mapping()", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "code", "degree": 3}, {"id": "modules_m4_mapping_lookup_club", "label": "lookup_club()", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 26.2, "font": {"size": 12, "color": "#ffffff"}, "title": "lookup_club()", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "code", "degree": 7}, {"id": "database_db_get_all_athletes", "label": "get_all_athletes()", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 19.2, "font": {"size": 12, "color": "#ffffff"}, "title": "get_all_athletes()", "community": 3, "community_name": "db.py", "source_file": "database/db.py", "file_type": "code", "degree": 4}, {"id": "database_db_insert_result", "label": "insert_result()", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 21.5, "font": {"size": 12, "color": "#ffffff"}, "title": "insert_result()", "community": 3, "community_name": "db.py", "source_file": "database/db.py", "file_type": "code", "degree": 5}, {"id": "database_db_update_athlete_ranking", "label": "update_athlete_ranking()", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 19.2, "font": {"size": 12, "color": "#ffffff"}, "title": "update_athlete_ranking()", "community": 3, "community_name": "db.py", "source_file": "database/db.py", "file_type": "code", "degree": 4}, {"id": "database_db_clear_athletes", "label": "clear_athletes()", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 23.8, "font": {"size": 12, "color": "#ffffff"}, "title": "clear_athletes()", "community": 4, "community_name": "get_connection", "source_file": "database/db.py", "file_type": "code", "degree": 6}, {"id": "database_db_get_connection", "label": "get_connection()", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 37.7, "font": {"size": 12, "color": "#ffffff"}, "title": "get_connection()", "community": 4, "community_name": "get_connection", "source_file": "database/db.py", "file_type": "code", "degree": 12}, {"id": "database_db_init_db", "label": "init_db()", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 23.8, "font": {"size": 12, "color": "#ffffff"}, "title": "init_db()", "community": 5, "community_name": "serve.py", "source_file": "database/db.py", "file_type": "code", "degree": 6}, {"id": "panel_serve_main", "label": "main()", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 14.6, "font": {"size": 12, "color": "#ffffff"}, "title": "main()", "community": 5, "community_name": "serve.py", "source_file": "panel/serve.py", "file_type": "code", "degree": 2}, {"id": "database_db_get_athletes_by_filter", "label": "get_athletes_by_filter()", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 23.8, "font": {"size": 12, "color": "#ffffff"}, "title": "get_athletes_by_filter()", "community": 6, "community_name": "get_athletes_by_filter", "source_file": "database/db.py", "file_type": "code", "degree": 6}, {"id": "database_db_get_missing_clubs_from_db", "label": "get_missing_clubs_from_db()", "color": {"background": "#FF9DA7", "border": "#FF9DA7", "highlight": {"background": "#ffffff", "border": "#FF9DA7"}}, "size": 23.8, "font": {"size": 12, "color": "#ffffff"}, "title": "get_missing_clubs_from_db()", "community": 7, "community_name": "get_missing_clubs_from_db", "source_file": "database/db.py", "file_type": "code", "degree": 6}, {"id": "database_db_insert_athlete", "label": "insert_athlete()", "color": {"background": "#9C755F", "border": "#9C755F", "highlight": {"background": "#ffffff", "border": "#9C755F"}}, "size": 23.8, "font": {"size": 12, "color": "#ffffff"}, "title": "insert_athlete()", "community": 8, "community_name": "insert_athlete", "source_file": "database/db.py", "file_type": "code", "degree": 6}, {"id": "basehttprequesthandler", "label": "BaseHTTPRequestHandler", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "BaseHTTPRequestHandler", "community": 0, "community_name": "DashboardHandler", "source_file": "", "file_type": "code", "degree": 1}, {"id": "panel_serve_rationale_113", "label": "Serve ranking API endpoint.", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Serve ranking API endpoint.", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "rationale", "degree": 1}, {"id": "panel_serve_rationale_147", "label": "Handle database clear request.", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Handle database clear request.", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "rationale", "degree": 1}, {"id": "panel_serve_rationale_73", "label": "HTTP request handler for dashboard.", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "HTTP request handler for dashboard.", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "rationale", "degree": 1}, {"id": "panel_serve_rationale_76", "label": "Suppress default logging.", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Suppress default logging.", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "rationale", "degree": 1}, {"id": "panel_serve_rationale_89", "label": "Handle POST requests.", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Handle POST requests.", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "rationale", "degree": 1}, {"id": "panel_serve_rationale_98", "label": "Serve dashboard HTML.", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Serve dashboard HTML.", "community": 0, "community_name": "DashboardHandler", "source_file": "panel/serve.py", "file_type": "rationale", "degree": 1}, {"id": "modules_lxf_parser", "label": "lxf_parser.py", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 30.8, "font": {"size": 12, "color": "#ffffff"}, "title": "lxf_parser.py", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "code", "degree": 9}, {"id": "test_lxf_data", "label": "test_lxf_data.py", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 21.5, "font": {"size": 12, "color": "#ffffff"}, "title": "test_lxf_data.py", "community": 1, "community_name": "lxf_parser.py", "source_file": "test_lxf_data.py", "file_type": "code", "degree": 5}, {"id": "modules_lxf_parser_rationale_1", "label": "LXF (Lenex) format parser for swimming competition data", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "LXF (Lenex) format parser for swimming competition data", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "rationale", "degree": 1}, {"id": "modules_lxf_parser_rationale_13", "label": "Parse LXF file and extract athletes and results. Returns: Tuple of (athletes,\u2026", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Parse LXF file and extract athletes and results. Returns: Tuple of (athletes,\u2026", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "rationale", "degree": 1}, {"id": "modules_lxf_parser_rationale_132", "label": "Convert swim time string (MM:SS.XX format) to seconds.", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Convert swim time string (MM:SS.XX format) to seconds.", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "rationale", "degree": 1}, {"id": "modules_lxf_parser_rationale_154", "label": "Extract birth year from birthdate string (YYYY-MM-DD format).", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Extract birth year from birthdate string (YYYY-MM-DD format).", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "rationale", "degree": 1}, {"id": "modules_lxf_parser_rationale_170", "label": "Map stroke code to Turkish name.", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Map stroke code to Turkish name.", "community": 1, "community_name": "lxf_parser.py", "source_file": "modules/lxf_parser.py", "file_type": "rationale", "degree": 1}, {"id": "panel_serve_rationale_32", "label": "Parse LXF file and insert athletes/results into database. Returns: { \"status\":\u2026", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Parse LXF file and insert athletes/results into database. Returns: { &quot;status&quot;:\u2026", "community": 1, "community_name": "lxf_parser.py", "source_file": "panel/serve.py", "file_type": "rationale", "degree": 1}, {"id": "modules_init", "label": "modules/__init__.py", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 10.0, "font": {"size": 0, "color": "#ffffff"}, "title": "modules/__init__.py", "community": 10, "community_name": "modules/__init__.py", "source_file": "modules/__init__.py", "file_type": "code", "degree": 0}, {"id": "panel_init", "label": "panel/__init__.py", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 10.0, "font": {"size": 0, "color": "#ffffff"}, "title": "panel/__init__.py", "community": 11, "community_name": "panel/__init__.py", "source_file": "panel/__init__.py", "file_type": "code", "degree": 0}, {"id": "config", "label": "config.py", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 19.2, "font": {"size": 12, "color": "#ffffff"}, "title": "config.py", "community": 2, "community_name": "m4_mapping.py", "source_file": "config.py", "file_type": "code", "degree": 4}, {"id": "modules_m4_mapping", "label": "m4_mapping.py", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 26.2, "font": {"size": 12, "color": "#ffffff"}, "title": "m4_mapping.py", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "code", "degree": 7}, {"id": "typeddict", "label": "TypedDict", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "TypedDict", "community": 2, "community_name": "m4_mapping.py", "source_file": "", "file_type": "code", "degree": 1}, {"id": "config_rationale_1", "label": "Configuration for Milli Tak\u0131m Se\u00e7me Sistemi", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Configuration for Milli Tak\u0131m Se\u00e7me Sistemi", "community": 2, "community_name": "m4_mapping.py", "source_file": "config.py", "file_type": "rationale", "degree": 1}, {"id": "modules_m4_mapping_rationale_1", "label": "m4_mapping.py \u2014 Club \u2192 City \u2192 Region lookup Reads Excel \"Kul\u00fcp \u015eehir\u2026", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "m4_mapping.py \u2014 Club \u2192 City \u2192 Region lookup Reads Excel &quot;Kul\u00fcp \u015eehir\u2026", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "rationale", "degree": 1}, {"id": "modules_m4_mapping_rationale_100", "label": "Look up club in cached mapping. Returns ClubInfo with city/region, or None if\u2026", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Look up club in cached mapping. Returns ClubInfo with city/region, or None if\u2026", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "rationale", "degree": 1}, {"id": "modules_m4_mapping_rationale_117", "label": "Get set of club names that don't map to a city/region. Useful for\u2026", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Get set of club names that don&#x27;t map to a city/region. Useful for\u2026", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "rationale", "degree": 1}, {"id": "modules_m4_mapping_rationale_35", "label": "Load Excel mapping into memory cache. Idempotent \u2014 only loads once, subsequent\u2026", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Load Excel mapping into memory cache. Idempotent \u2014 only loads once, subsequent\u2026", "community": 2, "community_name": "m4_mapping.py", "source_file": "modules/m4_mapping.py", "file_type": "rationale", "degree": 1}, {"id": "database_db", "label": "db.py", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 37.7, "font": {"size": 12, "color": "#ffffff"}, "title": "db.py", "community": 3, "community_name": "db.py", "source_file": "database/db.py", "file_type": "code", "degree": 12}, {"id": "database_init", "label": "database/__init__.py", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 33.1, "font": {"size": 12, "color": "#ffffff"}, "title": "database/__init__.py", "community": 3, "community_name": "db.py", "source_file": "database/__init__.py", "file_type": "code", "degree": 10}, {"id": "database_db_rationale_1", "label": "Database layer for Milli Tak\u0131m Se\u00e7me SQLite3 backend, UTF-8 encoding", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Database layer for Milli Tak\u0131m Se\u00e7me SQLite3 backend, UTF-8 encoding", "community": 3, "community_name": "db.py", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "database_db_rationale_172", "label": "Get all athletes from database.", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Get all athletes from database.", "community": 3, "community_name": "db.py", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "database_db_rationale_183", "label": "Update athlete's score and selection status.", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Update athlete&#x27;s score and selection status.", "community": 3, "community_name": "db.py", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "connection", "label": "Connection", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Connection", "community": 4, "community_name": "get_connection", "source_file": "", "file_type": "code", "degree": 1}, {"id": "database_db_rationale_11", "label": "Get SQLite connection with UTF-8 row factory.", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Get SQLite connection with UTF-8 row factory.", "community": 4, "community_name": "get_connection", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "database_db_rationale_201", "label": "Delete all athlete records (for re-import).", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Delete all athlete records (for re-import).", "community": 4, "community_name": "get_connection", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "panel_serve", "label": "serve.py", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 40.0, "font": {"size": 12, "color": "#ffffff"}, "title": "serve.py", "community": 5, "community_name": "serve.py", "source_file": "panel/serve.py", "file_type": "code", "degree": 13}, {"id": "database_db_rationale_19", "label": "Initialize database, create tables if missing.", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Initialize database, create tables if missing.", "community": 5, "community_name": "serve.py", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "database_db_rationale_145", "label": "Get athletes filtered by birth_year and/or gender. Returns list of dicts with\u2026", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Get athletes filtered by birth_year and/or gender. Returns list of dicts with\u2026", "community": 6, "community_name": "get_athletes_by_filter", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "database_db_rationale_218", "label": "Get list of unique clubs with region=0 (unmapped).", "color": {"background": "#FF9DA7", "border": "#FF9DA7", "highlight": {"background": "#ffffff", "border": "#FF9DA7"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Get list of unique clubs with region=0 (unmapped).", "community": 7, "community_name": "get_missing_clubs_from_db", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "database_db_rationale_81", "label": "Insert or replace athlete record.", "color": {"background": "#9C755F", "border": "#9C755F", "highlight": {"background": "#ffffff", "border": "#9C755F"}}, "size": 12.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Insert or replace athlete record.", "community": 8, "community_name": "insert_athlete", "source_file": "database/db.py", "file_type": "rationale", "degree": 1}, {"id": "federation_init", "label": "federation/__init__.py", "color": {"background": "#BAB0AC", "border": "#BAB0AC", "highlight": {"background": "#ffffff", "border": "#BAB0AC"}}, "size": 10.0, "font": {"size": 0, "color": "#ffffff"}, "title": "federation/__init__.py", "community": 9, "community_name": "federation/__init__.py", "source_file": "federation/__init__.py", "file_type": "code", "degree": 0}];
+const RAW_EDGES = [{"from": "panel_serve", "to": "panel_serve_dashboardhandler", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler", "to": "basehttprequesthandler", "label": "inherits", "title": "inherits [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler", "to": "panel_serve_dashboardhandler_do_get", "label": "method", "title": "method [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler", "to": "panel_serve_dashboardhandler_do_post", "label": "method", "title": "method [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler", "to": "panel_serve_dashboardhandler_handle_clear", "label": "method", "title": "method [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler", "to": "panel_serve_dashboardhandler_handle_upload", "label": "method", "title": "method [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler", "to": "panel_serve_dashboardhandler_log_message", "label": "method", "title": "method [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler", "to": "panel_serve_dashboardhandler_serve_api_ranking", "label": "method", "title": "method [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler", "to": "panel_serve_dashboardhandler_serve_index", "label": "method", "title": "method [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_rationale_73", "to": "panel_serve_dashboardhandler", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping", "to": "modules_m4_mapping_clubinfo", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping_clubinfo", "to": "typeddict", "label": "inherits", "title": "inherits [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping_lookup_club", "to": "modules_m4_mapping_clubinfo", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler_do_get", "to": "panel_serve_dashboardhandler_serve_api_ranking", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler_do_get", "to": "panel_serve_dashboardhandler_serve_index", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler_do_post", "to": "panel_serve_dashboardhandler_handle_clear", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler_do_post", "to": "panel_serve_dashboardhandler_handle_upload", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_rationale_89", "to": "panel_serve_dashboardhandler_do_post", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler_handle_clear", "to": "database_db_clear_athletes", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_rationale_147", "to": "panel_serve_dashboardhandler_handle_clear", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler_handle_upload", "to": "panel_serve_process_lxf_upload", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_rationale_76", "to": "panel_serve_dashboardhandler_log_message", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_dashboardhandler_serve_api_ranking", "to": "database_db_get_athletes_by_filter", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_rationale_113", "to": "panel_serve_dashboardhandler_serve_api_ranking", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_rationale_98", "to": "panel_serve_dashboardhandler_serve_index", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser", "to": "modules_lxf_parser_get_birth_year", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser_rationale_154", "to": "modules_lxf_parser_get_birth_year", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "modules_lxf_parser_get_birth_year", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_process_lxf_upload", "to": "modules_lxf_parser_get_birth_year", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "test_lxf_data", "to": "modules_lxf_parser_get_birth_year", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "test_lxf_data_main", "to": "modules_lxf_parser_get_birth_year", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser", "to": "modules_lxf_parser_map_stroke_name", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser_rationale_170", "to": "modules_lxf_parser_map_stroke_name", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "test_lxf_data", "to": "modules_lxf_parser_map_stroke_name", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "test_lxf_data_main", "to": "modules_lxf_parser_map_stroke_name", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser", "to": "modules_lxf_parser_parse_lxf_file", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser_parse_lxf_file", "to": "modules_lxf_parser_parse_swimtime", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser_parse_lxf_file", "to": "modules_m4_mapping_lookup_club", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser_rationale_13", "to": "modules_lxf_parser_parse_lxf_file", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "modules_lxf_parser_parse_lxf_file", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_process_lxf_upload", "to": "modules_lxf_parser_parse_lxf_file", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "test_lxf_data", "to": "modules_lxf_parser_parse_lxf_file", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "test_lxf_data_main", "to": "modules_lxf_parser_parse_lxf_file", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser", "to": "modules_lxf_parser_parse_swimtime", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser_rationale_132", "to": "modules_lxf_parser_parse_swimtime", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "panel_serve_process_lxf_upload", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_process_lxf_upload", "to": "database_db_get_missing_clubs_from_db", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_process_lxf_upload", "to": "database_db_insert_athlete", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_process_lxf_upload", "to": "database_db_insert_result", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_rationale_32", "to": "panel_serve_process_lxf_upload", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "test_lxf_data", "to": "test_lxf_data_main", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping", "to": "modules_m4_mapping_get_missing_clubs", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping_get_missing_clubs", "to": "modules_m4_mapping_lookup_club", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping_rationale_117", "to": "modules_m4_mapping_get_missing_clubs", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping", "to": "modules_m4_mapping_load_mapping", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping_lookup_club", "to": "modules_m4_mapping_load_mapping", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping_rationale_35", "to": "modules_m4_mapping_load_mapping", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser", "to": "modules_m4_mapping_lookup_club", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping", "to": "modules_m4_mapping_lookup_club", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping_rationale_100", "to": "modules_m4_mapping_lookup_club", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_get_all_athletes", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_get_all_athletes", "to": "database_db_get_connection", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_172", "to": "database_db_get_all_athletes", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_get_all_athletes", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_insert_result", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_insert_result", "to": "database_db_get_connection", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_insert_result", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "database_db_insert_result", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_update_athlete_ranking", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_183", "to": "database_db_update_athlete_ranking", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_update_athlete_ranking", "to": "database_db_get_connection", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_update_athlete_ranking", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_clear_athletes", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_clear_athletes", "to": "database_db_get_connection", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_201", "to": "database_db_clear_athletes", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_clear_athletes", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "database_db_clear_athletes", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_get_connection", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_get_athletes_by_filter", "to": "database_db_get_connection", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_get_connection", "to": "connection", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_get_missing_clubs_from_db", "to": "database_db_get_connection", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_init_db", "to": "database_db_get_connection", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_insert_athlete", "to": "database_db_get_connection", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_11", "to": "database_db_get_connection", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_get_connection", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_init_db", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_19", "to": "database_db_init_db", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_init_db", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "database_db_init_db", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve_main", "to": "database_db_init_db", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "panel_serve_main", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_get_athletes_by_filter", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_145", "to": "database_db_get_athletes_by_filter", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_get_athletes_by_filter", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "database_db_get_athletes_by_filter", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_get_missing_clubs_from_db", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_218", "to": "database_db_get_missing_clubs_from_db", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_get_missing_clubs_from_db", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "database_db_get_missing_clubs_from_db", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "database_db_insert_athlete", "label": "contains", "title": "contains [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_81", "to": "database_db_insert_athlete", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db_insert_athlete", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "database_db_insert_athlete", "label": "imports", "title": "imports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser", "to": "modules_m4_mapping", "label": "imports_from", "title": "imports_from [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_lxf_parser_rationale_1", "to": "modules_lxf_parser", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "modules_lxf_parser", "label": "imports_from", "title": "imports_from [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "test_lxf_data", "to": "modules_lxf_parser", "label": "imports_from", "title": "imports_from [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "config_rationale_1", "to": "config", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db", "to": "config", "label": "imports_from", "title": "imports_from [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping", "to": "config", "label": "imports_from", "title": "imports_from [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "panel_serve", "to": "config", "label": "imports_from", "title": "imports_from [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "modules_m4_mapping_rationale_1", "to": "modules_m4_mapping", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_db_rationale_1", "to": "database_db", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "database_init", "to": "database_db", "label": "re_exports", "title": "re_exports [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}];
+const LEGEND = [{"cid": 0, "color": "#4E79A7", "label": "DashboardHandler", "count": 15}, {"cid": 1, "color": "#F28E2B", "label": "lxf_parser.py", "count": 14}, {"cid": 2, "color": "#E15759", "label": "m4_mapping.py", "count": 12}, {"cid": 3, "color": "#76B7B2", "label": "db.py", "count": 8}, {"cid": 4, "color": "#59A14F", "label": "get_connection", "count": 5}, {"cid": 5, "color": "#EDC948", "label": "serve.py", "count": 4}, {"cid": 6, "color": "#B07AA1", "label": "get_athletes_by_filter", "count": 2}, {"cid": 7, "color": "#FF9DA7", "label": "get_missing_clubs_from_db", "count": 2}, {"cid": 8, "color": "#9C755F", "label": "insert_athlete", "count": 2}, {"cid": 9, "color": "#BAB0AC", "label": "federation/__init__.py", "count": 1}, {"cid": 10, "color": "#4E79A7", "label": "modules/__init__.py", "count": 1}, {"cid": 11, "color": "#F28E2B", "label": "panel/__init__.py", "count": 1}];
+
+// HTML-escape helper — prevents XSS when injecting graph data into innerHTML
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Build vis datasets
+const nodesDS = new vis.DataSet(RAW_NODES.map(n => ({
+  id: n.id, label: n.label, color: n.color, size: n.size,
+  font: n.font, title: n.title,
+  _community: n.community, _community_name: n.community_name,
+  _source_file: n.source_file, _file_type: n.file_type, _degree: n.degree,
+})));
+
+const edgesDS = new vis.DataSet(RAW_EDGES.map((e, i) => ({
+  id: i, from: e.from, to: e.to,
+  label: '',
+  title: e.title,
+  dashes: e.dashes,
+  width: e.width,
+  color: e.color,
+  arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+})));
+
+const container = document.getElementById('graph');
+const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
+  physics: {
+    enabled: true,
+    solver: 'forceAtlas2Based',
+    forceAtlas2Based: {
+      gravitationalConstant: -60,
+      centralGravity: 0.005,
+      springLength: 120,
+      springConstant: 0.08,
+      damping: 0.4,
+      avoidOverlap: 0.8,
+    },
+    stabilization: { iterations: 200, fit: true },
+  },
+  interaction: {
+    hover: true,
+    tooltipDelay: 100,
+    hideEdgesOnDrag: true,
+    navigationButtons: false,
+    keyboard: false,
+  },
+  nodes: { shape: 'dot', borderWidth: 1.5 },
+  edges: { smooth: { type: 'continuous', roundness: 0.2 }, selectionWidth: 3 },
+});
+
+network.once('stabilizationIterationsDone', () => {
+  network.setOptions({ physics: { enabled: false } });
+});
+
+function showInfo(nodeId) {
+  const n = nodesDS.get(nodeId);
+  if (!n) return;
+  const neighborIds = network.getConnectedNodes(nodeId);
+  const neighborItems = neighborIds.map(nid => {
+    const nb = nodesDS.get(nid);
+    const color = nb ? nb.color.background : '#555';
+    return `<span class="neighbor-link" style="border-left-color:${esc(color)}" data-nid="${esc(nid)}">${esc(nb ? nb.label : nid)}</span>`;
+  }).join('');
+  document.getElementById('info-content').innerHTML = `
+    <div class="field"><b>${esc(n.label)}</b></div>
+    <div class="field">Type: ${esc(n._file_type || 'unknown')}</div>
+    <div class="field">Community: ${esc(n._community_name)}</div>
+    <div class="field">Source: ${esc(n._source_file || '-')}</div>
+    <div class="field">Degree: ${n._degree}</div>
+    ${neighborIds.length ? `<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors (${neighborIds.length})</div><div id="neighbors-list">${neighborItems}</div>` : ''}
+  `;
+}
+
+function focusNode(nodeId) {
+  network.focus(nodeId, { scale: 1.4, animation: true });
+  network.selectNodes([nodeId]);
+  showInfo(nodeId);
+}
+
+// Neighbor links use a data attribute + one delegated listener rather than an
+// inline onclick. A node id/label sourced from a document or a scraped URL
+// (graphify add) can contain a double-quote; dropping the stringified id
+// unescaped into a quoted onclick both broke every link and allowed a hostile
+// source to inject an event handler into the local report (stored XSS, #1838).
+// esc() on data-nid keeps the value inside the attribute; the listener reads it
+// back verbatim. Bound to document so it survives the innerHTML rebuild that
+// recreates #neighbors-list on each showInfo().
+document.addEventListener('click', e => {
+  const el = e.target.closest('.neighbor-link');
+  if (el && el.dataset.nid !== undefined) focusNode(el.dataset.nid);
+});
+
+// Track hovered node — hover detection is more reliable than click params
+let hoveredNodeId = null;
+network.on('hoverNode', params => {
+  hoveredNodeId = params.node;
+  container.style.cursor = 'pointer';
+});
+network.on('blurNode', () => {
+  hoveredNodeId = null;
+  container.style.cursor = 'default';
+});
+container.addEventListener('click', () => {
+  if (hoveredNodeId !== null) {
+    showInfo(hoveredNodeId);
+    network.selectNodes([hoveredNodeId]);
+  }
+});
+network.on('click', params => {
+  if (params.nodes.length > 0) {
+    showInfo(params.nodes[0]);
+  } else if (hoveredNodeId === null) {
+    document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it</span>';
+  }
+});
+
+const searchInput = document.getElementById('search');
+const searchResults = document.getElementById('search-results');
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase().trim();
+  searchResults.innerHTML = '';
+  if (!q) { searchResults.style.display = 'none'; return; }
+  const matches = RAW_NODES.filter(n => n.label.toLowerCase().includes(q)).slice(0, 20);
+  if (!matches.length) { searchResults.style.display = 'none'; return; }
+  searchResults.style.display = 'block';
+  matches.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'search-item';
+    el.textContent = n.label;
+    el.style.borderLeft = `3px solid ${n.color.background}`;
+    el.style.paddingLeft = '8px';
+    el.onclick = () => {
+      network.focus(n.id, { scale: 1.5, animation: true });
+      network.selectNodes([n.id]);
+      showInfo(n.id);
+      searchResults.style.display = 'none';
+      searchInput.value = '';
+    };
+    searchResults.appendChild(el);
+  });
+});
+document.addEventListener('click', e => {
+  if (!searchResults.contains(e.target) && e.target !== searchInput)
+    searchResults.style.display = 'none';
+});
+
+const hiddenCommunities = new Set();
+
+const selectAllCb = document.getElementById('select-all-cb');
+
+function updateSelectAllState() {
+  const total = LEGEND.length;
+  const hidden = hiddenCommunities.size;
+  selectAllCb.checked = hidden === 0;
+  selectAllCb.indeterminate = hidden > 0 && hidden < total;
+}
+
+function toggleAllCommunities(hide) {
+  document.querySelectorAll('.legend-item').forEach(item => {
+    hide ? item.classList.add('dimmed') : item.classList.remove('dimmed');
+  });
+  document.querySelectorAll('.legend-cb').forEach(cb => {
+    cb.checked = !hide;
+  });
+  LEGEND.forEach(c => {
+    if (hide) hiddenCommunities.add(c.cid); else hiddenCommunities.delete(c.cid);
+  });
+  const updates = RAW_NODES.map(n => ({ id: n.id, hidden: hide }));
+  nodesDS.update(updates);
+  updateSelectAllState();
+}
+
+const legendEl = document.getElementById('legend');
+LEGEND.forEach(c => {
+  const item = document.createElement('div');
+  item.className = 'legend-item';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'legend-cb';
+  cb.checked = true;
+  cb.addEventListener('change', (e) => {
+    e.stopPropagation();
+    if (cb.checked) {
+      hiddenCommunities.delete(c.cid);
+      item.classList.remove('dimmed');
+    } else {
+      hiddenCommunities.add(c.cid);
+      item.classList.add('dimmed');
+    }
+    const updates = RAW_NODES
+      .filter(n => n.community === c.cid)
+      .map(n => ({ id: n.id, hidden: !cb.checked }));
+    nodesDS.update(updates);
+    updateSelectAllState();
+  });
+  item.innerHTML = `<div class="legend-dot" style="background:${c.color}"></div>
+    <span class="legend-label">${c.label}</span>
+    <span class="legend-count">${c.count}</span>`;
+  item.prepend(cb);
+  item.onclick = (e) => {
+    if (e.target === cb) return;
+    cb.checked = !cb.checked;
+    cb.dispatchEvent(new Event('change'));
+  };
+  legendEl.appendChild(item);
+});
+</script>
+<script>
+// Render hyperedges as shaded regions
+const hyperedges = [];
+// afterDrawing passes ctx already transformed to network coordinate space.
+// Draw node positions raw — no manual pan/zoom/DPR math needed.
+
+// Andrew's monotone chain. Returns the hull in counter-clockwise order, which
+// is what the perimeter must be traced in. Collinear and duplicate points
+// collapse to the extremes, so degenerate member sets render as a segment
+// rather than a zero-area crossed path.
+function convexHull(pts) {
+    const p = pts.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
+    if (p.length < 3) return p;
+    const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const build = seq => {
+        const out = [];
+        for (const q of seq) {
+            while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], q) <= 0) out.pop();
+            out.push(q);
+        }
+        out.pop();
+        return out;
+    };
+    const hull = build(p).concat(build(p.slice().reverse()));
+    return hull.length >= 3 ? hull : p;
+}
+network.on('afterDrawing', function(ctx) {
+    hyperedges.forEach(h => {
+        const positions = h.nodes
+            .map(nid => network.getPositions([nid])[nid])
+            .filter(p => p !== undefined);
+        if (positions.length < 2) return;
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = '#6366f1';
+        ctx.strokeStyle = '#6366f1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Centroid and expanded hull in network coordinates.
+        // The perimeter must follow hull order, not h.nodes order: tracing the
+        // raw member order self-intersects whenever the layout does not happen
+        // to place members in angular order, filling as crossed wedges.
+        const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+        const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+        const hull = convexHull(positions);
+        const expanded = hull.map(p => ({
+            x: cx + (p.x - cx) * 1.15,
+            y: cy + (p.y - cy) * 1.15
+        }));
+        ctx.moveTo(expanded[0].x, expanded[0].y);
+        expanded.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.4;
+        ctx.stroke();
+        // Label
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = '#4f46e5';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(h.label, cx, cy - 5);
+        ctx.restore();
+    });
+});
+</script>
+</body>
+</html>

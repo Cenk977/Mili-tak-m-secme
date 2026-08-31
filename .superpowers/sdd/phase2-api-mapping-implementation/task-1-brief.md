@@ -1,3 +1,23 @@
+# Task 1: Database Layer (`database/db.py`)
+
+**Files:**
+- Create: `database/db.py`
+- Modify: `database/__init__.py` (export init_db)
+
+**Interfaces:**
+- Produces: 
+  - `init_db()` → None (creates tables if missing)
+  - `get_connection() -> sqlite3.Connection`
+  - `insert_athlete(athlete_dict: Dict) -> bool`
+  - `get_athletes_by_filter(birth_year: int, gender: str | None) -> List[Dict]`
+  - `update_athlete_ranking(athlete_id: str, score: int, selected: bool, selection_type: str | None) -> bool`
+  - `clear_athletes() -> bool`
+
+## Step 1: Write database schema file
+
+Create `database/db.py`:
+
+```python
 """
 Database layer for Milli Takım Seçme
 SQLite3 backend, UTF-8 encoding
@@ -18,10 +38,10 @@ def get_connection() -> sqlite3.Connection:
 def init_db():
     """Initialize database, create tables if missing."""
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-
+    
     conn = get_connection()
     cursor = conn.cursor()
-
+    
     # Athletes table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS athletes (
@@ -43,7 +63,7 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
+    
     # Results table (for tracking individual race results)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS results (
@@ -60,7 +80,7 @@ def init_db():
             FOREIGN KEY (athlete_id) REFERENCES athletes(athlete_id)
         )
     """)
-
+    
     # Sync log (for tracking Excel imports)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS sync_log (
@@ -72,49 +92,7 @@ def init_db():
             synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
-    # Federation scoring: raw results (used for scoring)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS fed_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            race_leg TEXT NOT NULL,
-            race_date TEXT,
-            athlete_name TEXT NOT NULL,
-            birth_year INTEGER NOT NULL,
-            gender TEXT NOT NULL,
-            region INTEGER,
-            city TEXT,
-            club TEXT,
-            stroke TEXT NOT NULL,
-            distance INTEGER NOT NULL,
-            time_text TEXT,
-            time_seconds REAL,
-            points INTEGER,
-            source_pdf_seq INTEGER,
-            UNIQUE(race_leg, athlete_name, birth_year, stroke, distance)
-        )
-    """)
-
-    # Federation scoring: best per event (materialized from fed_results)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS fed_athlete_best (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            athlete_name TEXT NOT NULL,
-            birth_year INTEGER NOT NULL,
-            gender TEXT NOT NULL,
-            region INTEGER,
-            city TEXT,
-            club TEXT,
-            stroke TEXT NOT NULL,
-            distance INTEGER NOT NULL,
-            best_points INTEGER,
-            best_time_sec REAL,
-            best_time_txt TEXT,
-            best_leg TEXT,
-            PRIMARY KEY(athlete_name, birth_year, stroke, distance)
-        )
-    """)
-
+    
     conn.commit()
     conn.close()
 
@@ -126,7 +104,7 @@ def insert_athlete(athlete_dict: dict) -> bool:
         conn.execute("""
             INSERT OR REPLACE INTO athletes (
                 athlete_id, name, firstname, lastname, birthdate, birth_year,
-                gender, club_id, club_name, city, region, best_score,
+                gender, club_id, club_name, city, region, best_score, 
                 selected, selection_type
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -189,19 +167,19 @@ def get_athletes_by_filter(birth_year: int = None, gender: str = None) -> list:
     Returns list of dicts with all columns.
     """
     conn = get_connection()
-    query = "SELECT * FROM athletes WHERE 1=1"
+    query = "SELECT * FROM athletes WHERE selected = 1"
     params = []
-
+    
     if birth_year:
         query += " AND birth_year = ?"
         params.append(birth_year)
-
+    
     if gender:
         query += " AND gender = ?"
         params.append(gender)
-
+    
     query += " ORDER BY best_score DESC"
-
+    
     try:
         cursor = conn.execute(query, params)
         rows = cursor.fetchall()
@@ -243,10 +221,8 @@ def clear_athletes() -> bool:
     """Delete all athlete records (for re-import)."""
     conn = get_connection()
     try:
-        # Delete results first (has foreign key to athletes)
-        conn.execute("DELETE FROM results")
-        # Then delete athletes
         conn.execute("DELETE FROM athletes")
+        conn.execute("DELETE FROM results")
         conn.commit()
         return True
     except Exception as e:
@@ -268,3 +244,52 @@ def get_missing_clubs_from_db() -> list:
         return [row[0] for row in cursor.fetchall()]
     finally:
         conn.close()
+```
+
+## Step 2: Update `database/__init__.py` to export functions
+
+```python
+from database.db import (
+    init_db,
+    get_connection,
+    insert_athlete,
+    insert_result,
+    get_athletes_by_filter,
+    get_all_athletes,
+    update_athlete_ranking,
+    clear_athletes,
+    get_missing_clubs_from_db,
+)
+
+__all__ = [
+    'init_db',
+    'get_connection',
+    'insert_athlete',
+    'insert_result',
+    'get_athletes_by_filter',
+    'get_all_athletes',
+    'update_athlete_ranking',
+    'clear_athletes',
+    'get_missing_clubs_from_db',
+]
+```
+
+## Step 3: Test database initialization
+
+Run:
+```bash
+cd "C:\Users\PC\OneDrive - TED BURSA KOLEJİ\Masaüstü\Mili_takım_secme"
+python -c "from database.db import init_db; init_db(); print('✓ Database initialized')"
+```
+
+Expected: 
+- No errors
+- `data/selection.db` created
+- Tables: `athletes`, `results`, `sync_log`
+
+## Step 4: Commit
+
+```bash
+git add database/db.py database/__init__.py
+git commit -m "feat: add database schema and CRUD operations"
+```

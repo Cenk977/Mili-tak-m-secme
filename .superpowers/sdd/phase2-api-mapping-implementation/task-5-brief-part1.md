@@ -1,3 +1,29 @@
+# Task 5: HTTP Panel - Server Setup (`panel/serve.py`) — PART 1
+
+**Files:**
+- Create: `panel/serve.py`
+- Create: `panel/__init__.py`
+
+**Interfaces:**
+- Consumes:
+  - `parse_lxf_file()` from modules.lxf_parser
+  - `insert_athlete()`, `get_athletes_by_filter()`, `clear_athletes()`, `get_missing_clubs_from_db()` from database
+  - `lookup_club()` from modules.m4_mapping
+- Produces:
+  - HTTP server on port 8765
+  - Endpoints: GET /, POST /upload, GET /api/ranking, POST /clear
+
+## Step 1: Create empty `panel/__init__.py`
+
+```python
+# panel package
+```
+
+## Step 2: Write `panel/serve.py` — Complete Implementation
+
+Create `panel/serve.py` with this exact code:
+
+```python
 #!/usr/bin/env python3
 """
 panel/serve.py — HTTP server for Milli Takım Seçme Dashboard
@@ -11,24 +37,14 @@ Endpoints:
 
 import json
 import tempfile
-import sys
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import logging
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from database import init_db, insert_athlete, insert_result, get_athletes_by_filter, clear_athletes, get_missing_clubs_from_db
 from modules.lxf_parser import parse_lxf_file, get_birth_year
-from modules.m1_normalize import normalize_for_lookup
-from modules.m3_age import parse_birthdate
-from modules.m4_mapping import lookup_club
-from federasyon.scoring_tables import TABLES, POINTS, SELECTION_QUOTAS
-from federasyon.scorer import score_event, score_athlete_row, merge_scores, best_scores_sequence, compute_ranking_key
-from federasyon.ranker import rank_all
-from config import DB_PATH, TARGET_AGE_GROUPS, COMPETITION_YEAR
+from config import DB_PATH
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,30 +59,30 @@ def process_lxf_upload(file_path: str) -> dict:
         # Parse LXF
         athletes, results = parse_lxf_file(file_path)
         logger.info(f"Parsed {len(athletes)} athletes, {len(results)} results")
-
+        
         # Insert athletes
         for athlete in athletes:
             # Add birth_year if not present
             if 'birth_year' not in athlete or not athlete['birth_year']:
                 athlete['birth_year'] = get_birth_year(athlete.get('birthdate'))
-
+            
             insert_athlete(athlete)
-
+        
         # Insert results
         for result in results:
             result['race_source'] = 'antalya'  # Could be dynamic
             insert_result(result)
-
+        
         # Get missing clubs
         missing = get_missing_clubs_from_db()
-
+        
         return {
             "status": "success",
             "count": len(athletes),
             "missing_clubs": list(missing),
             "message": f"Imported {len(athletes)} athletes"
         }
-
+    
     except Exception as e:
         logger.error(f"Error processing LXF: {e}")
         return {
@@ -77,11 +93,11 @@ def process_lxf_upload(file_path: str) -> dict:
 
 class DashboardHandler(BaseHTTPRequestHandler):
     """HTTP request handler for dashboard."""
-
+    
     def log_message(self, format, *args):
         """Suppress default logging."""
         logger.info(format % args)
-
+    
     def do_GET(self):
         """Handle GET requests."""
         if self.path == '/':
@@ -90,7 +106,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.serve_api_ranking()
         else:
             self.send_error(404, "Not found")
-
+    
     def do_POST(self):
         """Handle POST requests."""
         if self.path == '/upload':
@@ -99,14 +115,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.handle_clear()
         else:
             self.send_error(404, "Not found")
-
+    
     def serve_index(self):
         """Serve dashboard HTML."""
         try:
             html_path = Path(__file__).parent / "index.html"
             with open(html_path, 'r', encoding='utf-8') as f:
                 html = f.read()
-
+            
             self.send_response(200)
             self.send_header('Content-type', 'text/html; charset=utf-8')
             self.send_header('Content-length', len(html.encode('utf-8')))
@@ -114,41 +130,41 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.wfile.write(html.encode('utf-8'))
         except FileNotFoundError:
             self.send_error(404, "index.html not found")
-
+    
     def serve_api_ranking(self):
         """Serve ranking API endpoint."""
         try:
             # Parse query params
             qs = urlparse(self.path).query
             params = parse_qs(qs)
-
+            
             birth_year = None
             gender = None
-
+            
             if 'birth_year' in params:
                 try:
                     birth_year = int(params['birth_year'][0])
                 except ValueError:
                     pass
-
+            
             if 'gender' in params:
                 gender = params['gender'][0] if params['gender'][0] else None
-
+            
             # Query database
             athletes = get_athletes_by_filter(birth_year, gender)
-
+            
             # Send JSON response
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
-
+            
             response_json = json.dumps(athletes, ensure_ascii=False, indent=2)
             self.wfile.write(response_json.encode('utf-8'))
-
+        
         except Exception as e:
             logger.error(f"Error in /api/ranking: {e}")
             self.send_error(500, str(e))
-
+    
     def handle_clear(self):
         """Handle database clear request."""
         try:
@@ -156,10 +172,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
-            self.wfile.write(json.dumps({"status": "success"}, ensure_ascii=False).encode('utf-8'))
+            self.wfile.write(json.dumps({"status": "success"}).encode('utf-8'))
         except Exception as e:
             self.send_error(500, str(e))
-
+    
     def handle_upload(self):
         """Handle file upload."""
         try:
@@ -168,86 +184,75 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if content_length == 0:
                 self.send_error(400, "No file provided")
                 return
-
-            # Read content as binary
+            
+            # Read content
             content = self.rfile.read(content_length)
-
-            # Parse multipart form data (binary-safe)
-            # Extract boundary from content-type header
-            content_type = self.headers.get('Content-Type', '')
+            
+            # Simple multipart parsing (basic, works for single file)
+            # Extract filename and file content
+            content_str = content.decode('utf-8', errors='ignore')
+            
+            # Split by boundary
             boundary = None
-            if 'boundary=' in content_type:
-                boundary = '--' + content_type.split('boundary=')[1].strip()
-
+            for line in content_str.split('\n')[:5]:
+                if line.startswith('--'):
+                    boundary = line.strip()
+                    break
+            
             if not boundary:
                 self.send_error(400, "Invalid multipart data")
                 return
-
-            # Find file content between boundaries (binary-safe)
+            
+            # Find file content between boundaries
+            parts = content_str.split(boundary)
             file_content_bytes = None
             filename = None
-            boundary_bytes = boundary.encode('utf-8')
-
-            # Split by boundary
-            parts = content.split(boundary_bytes)
-
+            
             for part in parts:
-                if b'filename=' in part:
-                    # Extract filename (text parsing is safe here)
-                    part_str = part.decode('utf-8', errors='ignore')
-                    for line in part_str.split('\n'):
+                if 'filename=' in part:
+                    # Extract filename
+                    for line in part.split('\n'):
                         if 'filename=' in line:
-                            try:
-                                filename = line.split('filename="')[1].split('"')[0]
-                            except IndexError:
-                                pass
+                            filename = line.split('filename="')[1].split('"')[0]
                             break
-
-                    # Extract binary content (keep as bytes)
-                    # Find the double newline that separates headers from content
-                    content_start = None
-
-                    # Try CRLF first (Windows style)
-                    idx = part.find(b'\r\n\r\n')
-                    if idx != -1:
-                        content_start = part[idx + 4:]  # Skip the 4 bytes of \r\n\r\n
-                    else:
-                        # Try LF only (Unix style)
-                        idx = part.find(b'\n\n')
-                        if idx != -1:
-                            content_start = part[idx + 2:]  # Skip the 2 bytes of \n\n
-
-                    if content_start is not None:
-                        # Remove trailing CRLF or LF before next boundary
-                        if content_start.endswith(b'\r\n'):
-                            content_start = content_start[:-2]
-                        elif content_start.endswith(b'\n'):
-                            content_start = content_start[:-1]
-
-                        # Save to temp file (binary mode, don't delete on close)
+                    
+                    # Extract binary content
+                    # Find the content after headers
+                    double_newline = part.find('\n\n')
+                    if double_newline != -1:
+                        # Re-encode the bytes since we had to decode for parsing
+                        content_start = part[double_newline + 2:]
+                        # Find end before next boundary
+                        content_end = content_start.rfind('\n--')
+                        if content_end == -1:
+                            content_end = content_start.rfind('\r\n--')
+                        if content_end == -1:
+                            content_end = len(content_start)
+                        
+                        # Save to temp file
                         with tempfile.NamedTemporaryFile(suffix='.lxf', delete=False) as tmp:
-                            tmp.write(content_start)
+                            tmp.write(content_start[:content_end].encode('latin-1'))
                             file_content_bytes = tmp.name
                         break
-
+            
             if not file_content_bytes:
                 self.send_error(400, "No file content found")
                 return
-
+            
             # Process LXF
             result = process_lxf_upload(file_content_bytes)
-
+            
             # Clean up temp file
             Path(file_content_bytes).unlink()
-
+            
             # Send response
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
-
+            
             response_json = json.dumps(result, ensure_ascii=False)
             self.wfile.write(response_json.encode('utf-8'))
-
+        
         except Exception as e:
             logger.error(f"Error handling upload: {e}", exc_info=True)
             self.send_error(500, str(e))
@@ -256,7 +261,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 def main():
     """Start HTTP server."""
     init_db()
-
+    
     server = HTTPServer(('localhost', 8765), DashboardHandler)
     print("=" * 60)
     print("Milli Takım Seçme — Dashboard")
@@ -265,7 +270,7 @@ def main():
     print(f"Database: {DB_PATH}")
     print("Press Ctrl+C to stop")
     print("=" * 60)
-
+    
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -275,3 +280,24 @@ def main():
 
 if __name__ == '__main__':
     main()
+```
+
+## Step 3: Test server startup (with 5-second timeout)
+
+Run:
+```bash
+cd "C:\Users\PC\OneDrive - TED BURSA KOLEJİ\Masaüstü\Mili_takım_secme"
+timeout 5 python panel/serve.py
+```
+
+Expected:
+- Server starts (outputs "Server running: http://localhost:8765")
+- Stops after 5 seconds
+- No errors
+
+## Step 4: Commit
+
+```bash
+git add panel/serve.py panel/__init__.py
+git commit -m "feat: add HTTP server with /upload and /api/ranking endpoints"
+```
