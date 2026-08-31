@@ -410,14 +410,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
             # Get athlete rankings with full scoring (all legs computed)
             athletes = get_athlete_rankings(birth_year, gender, region)
 
-            # Compute selection status based on combined scoring
-            selections = compute_selection_status(athletes)
+            # **IMPORTANT: Filter by leg FIRST before processing**
+            # Only show athletes that have events for the selected leg
+            if leg == 'antalya':
+                athletes = [a for a in athletes if len(a['antalya_events']) > 0]
+            elif leg == 'edirne':
+                athletes = [a for a in athletes if len(a['edirne_events']) > 0]
+            # for 'combined', show all athletes with any events
 
             # Transform to API response format
             response_athletes = []
             for athlete in athletes:
-                athlete_key = (athlete['athlete_name'], athlete['birth_year'], athlete['gender'])
-
                 # Determine which top3 to display based on leg selection
                 if leg == 'antalya':
                     display_top3 = athlete['antalya_top3']
@@ -452,7 +455,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'antalya_events': antalya_events_json,
                     'edirne_events': edirne_events_json,
                     'combined_events': combined_events_json,
-                    'selection_type': selections.get(athlete_key),
                 })
 
             # Send JSON response

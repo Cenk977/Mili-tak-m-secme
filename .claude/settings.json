@@ -4,7 +4,10 @@
       "Bash(dir)",
       "Read(//c/Users/PC/OneDrive - TED BURSA KOLEJ�/Masa�st�/**)",
       "Bash(python3)",
-      "Bash(python3 -c \"from config import DB_PATH; print\\(f'DB Path: {DB_PATH}'\\)\")"
+      "Bash(python3 -c \"from config import DB_PATH; print\\(f'DB Path: {DB_PATH}'\\)\")",
+      "Bash(rm -f /tmp/debug.txt)",
+      "Bash(curl -s \"http://localhost:8765/api/ranking?birth_year=2013&gender=F&leg=edirne\")",
+      "Read(//tmp/**)"
     ]
   }
 }
