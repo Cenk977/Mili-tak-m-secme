@@ -6,6 +6,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Optional
 from datetime import datetime
+from modules.m4_mapping import lookup_club
 
 
 def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
@@ -48,6 +49,22 @@ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
                         'gender': event.get('gender'),
                     }
 
+                # Build club lookup table (athleteid -> club info)
+                # Handles LXF formats where athletes are nested inside CLUB elements
+                club_by_athlete = {}
+                clubs = root.findall('.//CLUB')
+                for club_elem in clubs:
+                    club_id = club_elem.get('clubid')
+                    club_name = club_elem.get('clubname') or club_elem.get('name')
+                    athletes_in_club = club_elem.findall('.//ATHLETE')
+                    for athlete_in_club in athletes_in_club:
+                        athlete_id = athlete_in_club.get('athleteid')
+                        if athlete_id and club_name:
+                            club_by_athlete[athlete_id] = {
+                                'club_id': club_id,
+                                'club_name': club_name,
+                            }
+
                 # Parse athletes
                 athlete_elements = root.findall('.//ATHLETE')
 
@@ -62,13 +79,26 @@ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
                         'license': athlete_elem.get('license'),
                         'club_id': None,
                         'club_name': None,
+                        'city': 'Unknown',
+                        'region': 0,
                     }
 
-                    # Get club info if available
+                    # Get club info if available (direct child CLUB element)
                     club_elem = athlete_elem.find('.//CLUB')
                     if club_elem is not None:
                         athlete['club_id'] = club_elem.get('clubid')
                         athlete['club_name'] = club_elem.get('clubname')
+                    # Or from parent CLUB element (some LXF formats)
+                    elif athlete_id in club_by_athlete:
+                        athlete['club_id'] = club_by_athlete[athlete_id]['club_id']
+                        athlete['club_name'] = club_by_athlete[athlete_id]['club_name']
+
+                    # Look up city/region from Excel mapping
+                    if athlete['club_name']:
+                        mapping = lookup_club(athlete['club_name'])
+                        if mapping:
+                            athlete['city'] = mapping['city']
+                            athlete['region'] = mapping['region']
 
                     athletes_list.append(athlete)
 
