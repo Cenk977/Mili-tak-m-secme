@@ -512,8 +512,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_error(400, "No file content found")
                 return
 
-            # Process LXF
-            result = process_lxf_upload(file_content_bytes)
+            # Process LXF - detect race leg from filename
+            race_leg = 'antalya'  # default
+            if filename and 'edirne' in filename.lower():
+                race_leg = 'edirne'
+
+            result = process_lxf_upload(file_content_bytes, race_leg=race_leg)
 
             # Clean up temp file
             Path(file_content_bytes).unlink()
