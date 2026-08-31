@@ -186,11 +186,16 @@ _15M = {
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Ana tablo: birth_year → gender → event → point_thresholds
+# 2027 seçmeleri: 2009-2014 yaş grupları
+# Not: 2009/2010/2014 şimdilik placeholder (PDF'den gelecek barajlar ile update edilecek)
 # ─────────────────────────────────────────────────────────────────────────────
 TABLES: dict = {
-    2013: {"F": _13F, "M": _13M},
-    2012: {"F": _14F, "M": _14M},
-    2011: {"F": _15F, "M": _15M},
+    2014: {"F": _13F, "M": _13M},      # 13 yaş (placeholder: 2013 doğumlu barajları)
+    2013: {"F": _13F, "M": _13M},      # 14 yaş (2013 doğumlu)
+    2012: {"F": _14F, "M": _14M},      # 15 yaş (2012 doğumlu)
+    2011: {"F": _15F, "M": _15M},      # 16 yaş (2011 doğumlu)
+    2010: {"F": _15F, "M": _15M},      # 17 yaş (placeholder: 2011 doğumlu barajları)
+    2009: {"F": _15F, "M": _15M},      # 18 yaş (placeholder: 2011 doğumlu barajları)
 }
 
 # Excel sütun adı → (stroke, distance) eşlemesi

@@ -268,3 +268,125 @@ def get_missing_clubs_from_db() -> list:
         return [row[0] for row in cursor.fetchall()]
     finally:
         conn.close()
+
+
+def insert_fed_result(result_dict: dict) -> bool:
+    """Insert federation result into fed_results table."""
+    conn = get_connection()
+    try:
+        conn.execute("""
+            INSERT OR REPLACE INTO fed_results (
+                race_leg, race_date, athlete_name, birth_year, gender,
+                region, city, club, stroke, distance,
+                time_text, time_seconds, points, source_pdf_seq
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            result_dict.get('race_leg', 'antalya'),
+            result_dict.get('race_date'),
+            result_dict.get('athlete_name'),
+            result_dict.get('birth_year'),
+            result_dict.get('gender'),
+            result_dict.get('region', 0),
+            result_dict.get('city'),
+            result_dict.get('club'),
+            result_dict.get('stroke'),
+            result_dict.get('distance'),
+            result_dict.get('time_text'),
+            result_dict.get('time_seconds'),
+            result_dict.get('points'),
+            result_dict.get('source_pdf_seq'),
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error inserting fed_result: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def insert_fed_athlete_best(best_dict: dict) -> bool:
+    """Insert or update federation athlete best into fed_athlete_best table."""
+    conn = get_connection()
+    try:
+        conn.execute("""
+            INSERT OR REPLACE INTO fed_athlete_best (
+                athlete_name, birth_year, gender, region, city, club,
+                stroke, distance, best_points, best_time_sec, best_time_txt, best_leg
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            best_dict.get('athlete_name'),
+            best_dict.get('birth_year'),
+            best_dict.get('gender'),
+            best_dict.get('region', 0),
+            best_dict.get('city'),
+            best_dict.get('club'),
+            best_dict.get('stroke'),
+            best_dict.get('distance'),
+            best_dict.get('best_points'),
+            best_dict.get('best_time_sec'),
+            best_dict.get('best_time_txt'),
+            best_dict.get('best_leg'),
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error inserting fed_athlete_best: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_fed_athlete_best(birth_year: int = None, gender: str = None) -> list:
+    """Get fed_athlete_best filtered by birth_year and/or gender."""
+    conn = get_connection()
+    query = "SELECT * FROM fed_athlete_best WHERE 1=1"
+    params = []
+
+    if birth_year:
+        query += " AND birth_year = ?"
+        params.append(birth_year)
+
+    if gender:
+        query += " AND gender = ?"
+        params.append(gender)
+
+    try:
+        cursor = conn.execute(query, params)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def get_fed_results(race_leg: str = None) -> list:
+    """Get fed_results, optionally filtered by race_leg."""
+    conn = get_connection()
+    query = "SELECT * FROM fed_results WHERE 1=1"
+    params = []
+
+    if race_leg:
+        query += " AND race_leg = ?"
+        params.append(race_leg)
+
+    try:
+        cursor = conn.execute(query, params)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def clear_fed_tables() -> bool:
+    """Clear fed_results and fed_athlete_best tables (for re-import)."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM fed_results")
+        conn.execute("DELETE FROM fed_athlete_best")
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error clearing fed tables: {e}")
+        return False
+    finally:
+        conn.close()

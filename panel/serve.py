@@ -20,7 +20,11 @@ import logging
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database import init_db, insert_athlete, insert_result, get_athletes_by_filter, clear_athletes, get_missing_clubs_from_db
+from database import (
+    init_db, insert_athlete, insert_result, get_athletes_by_filter, clear_athletes,
+    get_missing_clubs_from_db, insert_fed_result, insert_fed_athlete_best, get_fed_athlete_best,
+    get_fed_results, clear_fed_tables
+)
 from modules.lxf_parser import parse_lxf_file, get_birth_year
 from modules.m1_normalize import normalize_for_lookup
 from modules.m3_age import parse_birthdate
@@ -34,41 +38,244 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def process_lxf_upload(file_path: str) -> dict:
+def load_manual_overrides() -> dict:
+    """Load manual overrides from JSON file."""
+    overrides_path = Path(__file__).parent.parent / "manual_overrides.json"
+    if overrides_path.exists():
+        with open(overrides_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {"club_aliases": [], "name_overrides": []}
+
+
+def get_name_override(name: str, birth_year: int, gender: str, overrides: dict) -> dict:
     """
-    Parse LXF file and insert athletes/results into database.
-    Returns: { "status": "success|error", "count": int, "missing_clubs": list }
+    Check if name+birth_year+gender matches any name_override.
+    Returns override dict or None.
+    """
+    for override in overrides.get("name_overrides", []):
+        if (override.get("name") == name and
+            override.get("birth_year") == birth_year and
+            override.get("gender") == gender):
+            return override
+    return None
+
+
+def get_club_override(club_name: str, overrides: dict) -> dict:
+    """
+    Check if club name matches any club_aliases.
+    Returns {canonical, city, region} or None.
+    """
+    if not club_name:
+        return None
+
+    norm_club = normalize_for_lookup(club_name)
+
+    for alias in overrides.get("club_aliases", []):
+        if normalize_for_lookup(alias.get("raw", "")) == norm_club:
+            return {
+                "club": alias.get("canonical"),
+                "city": alias.get("city"),
+                "region": alias.get("region")
+            }
+    return None
+
+
+def compute_and_save_best_scores(race_leg: str = 'antalya') -> int:
+    """
+    Read fed_results, compute best scores per (athlete, stroke, distance),
+    and save to fed_athlete_best. Returns count saved.
+    """
+    from collections import defaultdict
+
+    results = get_fed_results(race_leg)
+    logger.info(f"Computing best scores from {len(results)} fed_results")
+
+    # Group by (athlete_name, birth_year, gender, stroke, distance)
+    grouped = defaultdict(list)
+    for r in results:
+        key = (r['athlete_name'], r['birth_year'], r['gender'], r['stroke'], r['distance'])
+        grouped[key].append(r)
+
+    saved_count = 0
+
+    for (athlete_name, birth_year, gender, stroke, distance), group in grouped.items():
+        # Find best (lowest) time
+        valid_results = [r for r in group if r['time_seconds'] is not None]
+        if not valid_results:
+            continue
+
+        best_result = min(valid_results, key=lambda r: r['time_seconds'])
+        best_time_sec = best_result['time_seconds']
+        best_time_txt = best_result['time_text']
+        best_leg = best_result['race_leg']
+
+        # Compute score using score_event()
+        try:
+            best_points = score_event(best_time_sec, birth_year, gender, stroke, distance)
+        except Exception as e:
+            logger.warning(f"Error scoring {athlete_name} {birth_year} {gender} {stroke} {distance}: {e}")
+            best_points = 0
+
+        # Save to fed_athlete_best
+        best_dict = {
+            'athlete_name': athlete_name,
+            'birth_year': birth_year,
+            'gender': gender,
+            'region': best_result['region'],
+            'city': best_result['city'],
+            'club': best_result['club'],
+            'stroke': stroke,
+            'distance': distance,
+            'best_points': best_points,
+            'best_time_sec': best_time_sec,
+            'best_time_txt': best_time_txt,
+            'best_leg': best_leg,
+        }
+
+        if insert_fed_athlete_best(best_dict):
+            saved_count += 1
+
+    logger.info(f"Saved {saved_count} best scores to fed_athlete_best")
+    return saved_count
+
+
+def normalize_athlete_data(athlete: dict, result: dict, overrides: dict) -> tuple:
+    """
+    Normalize athlete/result using overrides + Excel mapping.
+    Returns (athlete_updated, result_updated).
+    """
+    # Check name override first
+    name_override = get_name_override(
+        athlete.get("name", ""),
+        athlete.get("birth_year"),
+        athlete.get("gender"),
+        overrides
+    )
+
+    if name_override:
+        athlete["name"] = name_override.get("canonical_name", athlete.get("name"))
+        athlete["club_name"] = name_override.get("canonical_club")
+        athlete["city"] = name_override.get("canonical_city")
+        athlete["region"] = name_override.get("canonical_region", 0)
+
+        result["club"] = name_override.get("canonical_club")
+        result["city"] = name_override.get("canonical_city")
+        result["region"] = name_override.get("canonical_region", 0)
+
+        return athlete, result
+
+    # Check club override
+    club_override = get_club_override(athlete.get("club_name", ""), overrides)
+    if club_override:
+        athlete["club_name"] = club_override["club"]
+        athlete["city"] = club_override["city"]
+        athlete["region"] = club_override["region"]
+
+        result["club"] = club_override["club"]
+        result["city"] = club_override["city"]
+        result["region"] = club_override["region"]
+
+        return athlete, result
+
+    # Fall back to Excel mapping
+    lookup_result = lookup_club(athlete.get("club_name", ""))
+    if lookup_result:
+        athlete["city"] = lookup_result.get("city", "Unknown")
+        athlete["region"] = lookup_result.get("region", 0)
+
+        result["city"] = lookup_result.get("city", "Unknown")
+        result["region"] = lookup_result.get("region", 0)
+
+    return athlete, result
+
+
+def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
+    """
+    Parse LXF file, normalize, and insert into fed_results table.
+    Pipeline: parse → normalize → fed_results
     """
     try:
+        # Load manual overrides
+        overrides = load_manual_overrides()
+        logger.info(f"Loaded overrides: {len(overrides.get('name_overrides', []))} names, {len(overrides.get('club_aliases', []))} clubs")
+
         # Parse LXF
         athletes, results = parse_lxf_file(file_path)
-        logger.info(f"Parsed {len(athletes)} athletes, {len(results)} results")
+        logger.info(f"Parsed {len(athletes)} athletes, {len(results)} results from {race_leg}")
 
-        # Insert athletes
+        fed_results_count = 0
+        fed_athletes = {}  # Track unique athletes for fed_athlete_best later
+
+        # Process each athlete
         for athlete in athletes:
-            # Add birth_year if not present
+            # Add birth_year if missing
             if 'birth_year' not in athlete or not athlete['birth_year']:
                 athlete['birth_year'] = get_birth_year(athlete.get('birthdate'))
 
-            insert_athlete(athlete)
+            # Find this athlete's results
+            athlete_results = [r for r in results if r.get('athlete_id') == athlete.get('athlete_id')]
 
-        # Insert results
-        for result in results:
-            result['race_source'] = 'antalya'  # Could be dynamic
-            insert_result(result)
+            if not athlete_results:
+                continue
 
-        # Get missing clubs
-        missing = get_missing_clubs_from_db()
+            # Normalize and insert results
+            for result in athlete_results:
+                athlete, result = normalize_athlete_data(athlete, result, overrides)
+
+            # Build full name
+            full_name = f"{athlete.get('firstname', '')} {athlete.get('lastname', '')}".strip()
+            athlete['name'] = full_name
+
+            # Store athlete key for fed_athlete_best
+            athlete_key = (full_name, athlete.get('birth_year'), athlete.get('gender'))
+            if athlete_key not in fed_athletes:
+                fed_athletes[athlete_key] = {
+                    'athlete_name': full_name,
+                    'birth_year': athlete.get('birth_year'),
+                    'gender': athlete.get('gender'),
+                    'region': athlete.get('region', 0),
+                    'city': athlete.get('city', 'Unknown'),
+                    'club': athlete.get('club_name', 'Unknown'),
+                }
+
+            # Insert each result into fed_results
+            for result in athlete_results:
+                fed_result = {
+                    'race_leg': race_leg,
+                    'race_date': None,
+                    'athlete_name': full_name,
+                    'birth_year': athlete.get('birth_year'),
+                    'gender': athlete.get('gender'),
+                    'region': athlete.get('region', 0),
+                    'city': athlete.get('city', 'Unknown'),
+                    'club': athlete.get('club_name', 'Unknown'),
+                    'stroke': result.get('stroke'),
+                    'distance': result.get('distance'),
+                    'time_text': result.get('time_text'),
+                    'time_seconds': result.get('time_seconds'),
+                    'points': None,
+                    'source_pdf_seq': None,
+                }
+
+                if insert_fed_result(fed_result):
+                    fed_results_count += 1
+
+        logger.info(f"Inserted {fed_results_count} results into fed_results table")
+
+        # Compute and save best scores
+        best_saved = compute_and_save_best_scores(race_leg)
 
         return {
             "status": "success",
             "count": len(athletes),
-            "missing_clubs": list(missing),
-            "message": f"Imported {len(athletes)} athletes"
+            "results_imported": fed_results_count,
+            "best_scores_computed": best_saved,
+            "leg": race_leg,
+            "message": f"Imported {len(athletes)} athletes, {fed_results_count} results, {best_saved} best scores"
         }
 
     except Exception as e:
-        logger.error(f"Error processing LXF: {e}")
+        logger.error(f"Error processing LXF: {e}", exc_info=True)
         return {
             "status": "error",
             "message": str(e)
@@ -134,8 +341,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if 'gender' in params:
                 gender = params['gender'][0] if params['gender'][0] else None
 
-            # Query database
-            athletes = get_athletes_by_filter(birth_year, gender)
+            # Get fed_athlete_best
+            athletes = get_fed_athlete_best(birth_year, gender)
 
             # Send JSON response
             self.send_response(200)

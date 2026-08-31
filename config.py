@@ -44,8 +44,8 @@ STROKE_MAP = {
     "MEDLEY": "Karışık"
 }
 
-# Age groups for selection (2027: 14, 13, 12-year-olds)
-TARGET_AGE_GROUPS = {2014, 2013, 2012}
+# Age groups for selection (2027: 2009-2014 doğumlular)
+TARGET_AGE_GROUPS = {2009, 2010, 2011, 2012, 2013, 2014}
 TARGET_BIRTH_YEARS = TARGET_AGE_GROUPS  # backward compatibility
 
 # Birth year parsing
@@ -53,24 +53,12 @@ YB_CENTURY_CUTOFF = 26  # For 2-digit years: 00-26 = 2000-2026, 27+ = 1927-1999
 
 # Selection quotas for national team (per age group)
 SELECTION_QUOTAS = {
-    2014: {
-        "tr": 8,
-        "region_1": 3,
-        "region_other": 2,
-        "min_points": 7
-    },
-    2013: {
-        "tr": 8,
-        "region_1": 3,
-        "region_other": 2,
-        "min_points": 7
-    },
-    2012: {
-        "tr": 8,
-        "region_1": 3,
-        "region_other": 2,
-        "min_points": 7
-    }
+    2014: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7},
+    2013: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7},
+    2012: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7},
+    2011: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7},
+    2010: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7},
+    2009: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7}
 }
 
 # Scoring points system (baraj)
