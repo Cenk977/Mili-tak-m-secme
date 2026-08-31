@@ -48,6 +48,9 @@ STROKE_MAP = {
 TARGET_AGE_GROUPS = {2014, 2013, 2012}
 TARGET_BIRTH_YEARS = TARGET_AGE_GROUPS  # backward compatibility
 
+# Birth year parsing
+YB_CENTURY_CUTOFF = 26  # For 2-digit years: 00-26 = 2000-2026, 27+ = 1927-1999
+
 # Selection quotas for national team (per age group)
 SELECTION_QUOTAS = {
     2014: {
