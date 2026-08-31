@@ -1,6 +1,6 @@
 # Milli Takım Seçme 2026 — Ulusal Takım Sporcuları Değerlendirme Sistemi
 
-Türkiye Yüzme Federasyonu için ulusal takım sporcuları seçim sistemi. LENEX XML format yarışma sonuçlarını ayrıştırarak, Türkiye federasyonu standartlarına göre sporcuları puanlayan ve ulusal takım üyelerini seçen bir sistemdir.
+ Ulusal takım sporcuları seçim sistemi. LENEX XML format yarışma sonuçlarını ayrıştırarak, Belirli standartlara göre sporcuları puanlayan ve ulusal takım üyelerini seçen bir sistemdir.
 
 ## Özellikler
 
