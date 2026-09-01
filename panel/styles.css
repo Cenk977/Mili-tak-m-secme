@@ -166,12 +166,18 @@ body {
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
-  transition: opacity 0.2s;
+  font-size: 16px;
+  font-weight: bold;
+  transition: opacity 0.2s, transform 0.2s;
+  line-height: 1;
 }
 
 .col-action button:hover {
   opacity: 0.8;
+}
+
+.expand-btn.open {
+  transform: rotate(180deg);
 }
 
 /* ===== SELECTION BADGES ===== */
@@ -225,6 +231,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.races-placeholder {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
 }
 
 /* ===== RACES TABLE (IN DETAIL ROW) ===== */
