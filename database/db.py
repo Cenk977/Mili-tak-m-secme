@@ -394,9 +394,9 @@ def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int
     finally:
         conn.close()
 
-    # Filter: only keep athletes with birth_years that have scoring tables
-    valid_years = set(TABLES.keys())
-    results = [r for r in results if r['birth_year'] in valid_years]
+    # Filter: only keep athletes with birth_years that have REAL (non-placeholder) scoring tables
+    from config import VALID_SCORING_YEARS
+    results = [r for r in results if r['birth_year'] in VALID_SCORING_YEARS]
 
     # Group by athlete (athlete_name, birth_year, gender)
     by_athlete = defaultdict(lambda: {
