@@ -460,12 +460,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
             # Get athlete rankings with full scoring (all legs computed)
             athletes = get_athlete_rankings(birth_year, gender, region)
 
-            # Add default selection fields (selection status TBD - needs more work)
-            for a in athletes:
-                a['selected'] = '-'
-                a['selected_slot'] = '-'
-                a['multinations'] = False
-
             # **IMPORTANT: Filter by leg FIRST before processing**
             # Only show athletes that have events for the selected leg
             if leg == 'antalya':
@@ -473,6 +467,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
             elif leg == 'edirne':
                 athletes = [a for a in athletes if len(a['edirne_events']) > 0]
             # for 'combined', show all athletes with any events
+
+            # Apply selection status BEFORE converting to JSON (tuple keys needed)
+            try:
+                athletes = apply_selection_status(athletes)
+            except Exception as e:
+                logger.warning(f"Error applying selection status: {e}")
+                # Fallback: set default values
+                for a in athletes:
+                    a['selected'] = '-'
+                    a['selected_slot'] = '-'
+                    a['multinations'] = False
 
             # Transform to API response format
             response_athletes = []
