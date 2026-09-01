@@ -32,7 +32,8 @@ from modules.m3_age import parse_birthdate
 from modules.m4_mapping import lookup_club
 from federasyon.scoring_tables import TABLES, POINTS, SELECTION_QUOTAS
 from federasyon.scorer import score_event, score_athlete_row, merge_scores, best_scores_sequence, compute_ranking_key
-from federasyon.ranker import rank_all
+from federasyon.ranker import rank_all, rank_group
+from federasyon.multinations import is_multinations
 from config import DB_PATH, TARGET_AGE_GROUPS, COMPETITION_YEAR
 
 logging.basicConfig(level=logging.INFO)
@@ -139,6 +140,38 @@ def compute_and_save_best_scores(race_leg: str = 'antalya') -> int:
     saved_count = batch_insert_fed_athlete_best(best_scores_batch)
     logger.info(f"Batch saved {saved_count} best scores to fed_athlete_best")
     return saved_count
+
+
+def apply_selection_status(athletes: list) -> list:
+    """
+    Apply selection status using rank_group logic.
+    Adds 'selected', 'multinations', 'selected_slot' fields to each athlete.
+    """
+    from collections import defaultdict
+
+    # Prepare athletes for rank_group: add event_scores = combined_events
+    for a in athletes:
+        a['event_scores'] = a.get('combined_events', {})
+        a['name'] = a.get('athlete_name', '')
+
+    # Group by birth_year and gender (like rank_all does)
+    by_group = defaultdict(list)
+    for a in athletes:
+        key = (a['birth_year'], a['gender'])
+        by_group[key].append(a)
+
+    # Apply rank_group to each group
+    all_ranked = []
+    for (birth_year, gender), group in sorted(by_group.items()):
+        # Add multinations flag
+        for a in group:
+            a['multinations'] = is_multinations(a.get('name'), birth_year, gender)
+
+        # Apply ranking and selection
+        ranked_group = rank_group(group)
+        all_ranked.extend(ranked_group)
+
+    return all_ranked
 
 
 def compute_selection_status(athletes: list) -> dict:
