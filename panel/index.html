@@ -219,7 +219,12 @@
             border-bottom: 1px solid #eee;
         }
 
-        tbody tr:hover {
+        tbody tr.athlete-row:hover {
+            background: #f0f2ff;
+            cursor: pointer;
+        }
+
+        tbody tr.athlete-detail-row {
             background: #f9f9f9;
         }
 
@@ -689,7 +694,7 @@
                     '<th>Seçim</th>' +
                     '</tr></thead><tbody>';
 
-                athletes.forEach(athlete => {
+                athletes.forEach((athlete, idx) => {
                     const name = athlete.athlete_name || 'Bilinmiyor';
                     const club = athlete.club || 'Bilinmiyor';
                     const city = athlete.city || 'Bilinmiyor';
@@ -697,15 +702,16 @@
                     const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
                     const gender = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kız' : '-';
                     const score = athlete.display_top3 ? (athlete.display_top3).toString() : '0';
-                    const selectionType = athlete.selection_type;
-                    const selectionBadge = selectionType ?
+                    const selectionType = athlete.selected;
+                    const selectionBadge = selectionType && selectionType !== '-' ?
                         `<span class="badge selection-${selectionType}">${selectionType}</span>` :
                         '<span style="color: #999;">-</span>';
                     const regionBadge = region ?
                         `<span class="badge region-${region}">Bölge ${region}</span>` :
                         '<span style="color: #999;">Bilinmiyor</span>';
 
-                    html += `<tr onclick="showAthleteDetail(${JSON.stringify(athlete).replace(/"/g, '&quot;')})">
+                    const athleteKey = `athlete-${idx}`;
+                    html += `<tr class="athlete-row" onclick="toggleAthleteDetail('${athleteKey}', ${JSON.stringify(athlete).replace(/"/g, '&quot;')})">
                         <td class="cursor-pointer"><strong>${name}</strong></td>
                         <td>${club}</td>
                         <td>${city}</td>
@@ -714,6 +720,9 @@
                         <td>${gender}</td>
                         <td>${score}</td>
                         <td>${selectionBadge}</td>
+                    </tr>
+                    <tr class="athlete-detail-row" id="detail-${athleteKey}" style="display: none;">
+                        <td colspan="8" id="detail-content-${athleteKey}"></td>
                     </tr>`;
                 });
 
@@ -747,68 +756,103 @@
         // Load initial rankings (commented - wait for user filter)
         // loadRankings();
 
-        // Athlete detail modal
-        function showAthleteDetail(athlete) {
-            const modal = document.getElementById('athleteModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalBody = document.getElementById('modalBody');
+        // Toggle athlete detail row (inline expand)
+        function toggleAthleteDetail(athleteKey, athlete) {
+            const detailRow = document.getElementById(`detail-${athleteKey}`);
+            const contentCell = document.getElementById(`detail-content-${athleteKey}`);
+
+            const isVisible = detailRow.style.display !== 'none';
+
+            if (isVisible) {
+                detailRow.style.display = 'none';
+                return;
+            }
 
             const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
             const gender = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kız' : '-';
             const regionName = ['Bilinmiyor', 'İstanbul', 'Marmara', 'Ege', 'İç Anadolu', 'Karadeniz', 'Güneydoğu'][athlete.region || 0];
 
-            modalTitle.textContent = athlete.athlete_name;
+            let html = '<div style="padding: 15px; background: #f9f9f9; border-radius: 6px;">';
 
-            let html = '<div class="athlete-detail">';
-            html += '<div class="athlete-detail-row"><strong>Yaş:</strong><span>' + age + '</span></div>';
-            html += '<div class="athlete-detail-row"><strong>Cinsiyet:</strong><span>' + gender + '</span></div>';
-            html += '<div class="athlete-detail-row"><strong>Bölge:</strong><span>' + regionName + '</span></div>';
-            html += '<div class="athlete-detail-row"><strong>Şehir:</strong><span>' + (athlete.city || '-') + '</span></div>';
-            html += '<div class="athlete-detail-row"><strong>Kulüp:</strong><span>' + (athlete.club || '-') + '</span></div>';
+            // Top info row
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+            html += '<div><strong style="font-size: 12px; color: #666;">Yaş:</strong><div>' + age + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Cinsiyet:</strong><div>' + gender + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Bölge:</strong><div>' + regionName + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Şehir:</strong><div>' + (athlete.city || '-') + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Kulüp:</strong><div>' + (athlete.club || '-') + '</div></div>';
             html += '</div>';
 
-            // Determine which events to show based on current leg selection
-            let displayEvents = athlete.combined_events;
-            let displayTitle = 'Tüm Yarışmalar (Birleştirilmiş)';
-
-            if (currentLeg === 'antalya') {
-                displayEvents = athlete.antalya_events || {};
-                displayTitle = 'Antalya Yarışmaları';
-            } else if (currentLeg === 'edirne') {
-                displayEvents = athlete.edirne_events || {};
-                displayTitle = 'Edirne Yarışmaları';
+            // Selection status
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px; padding: 10px; background: white; border-radius: 4px; border-left: 3px solid #667eea;">';
+            const selectionColor = {
+                'TR': '#fff59d',
+                'BÖLGE': '#c5e1a5',
+                'BARAJ_YOK': '#ffccbc',
+                '-': '#e0e0e0'
+            };
+            const selStatus = athlete.selected || '-';
+            html += '<div><strong style="font-size: 12px; color: #666;">Seçim:</strong><div style="background: ' + (selectionColor[selStatus] || '#f5f5f5') + '; padding: 4px 8px; border-radius: 3px; font-weight: 600;">' + selStatus + '</div></div>';
+            if (athlete.selected_slot && athlete.selected_slot !== '-') {
+                html += '<div><strong style="font-size: 12px; color: #666;">Seçim Sırası:</strong><div>' + athlete.selected_slot + '</div></div>';
             }
+            if (athlete.multinations) {
+                html += '<div><strong style="font-size: 12px; color: #666;">Statü:</strong><div style="background: #fce4ec; padding: 4px 8px; border-radius: 3px; color: #c2185b; font-weight: 600;">⭐ Multinations</div></div>';
+            }
+            html += '</div>';
 
-            // Add events table for current leg
-            if (Object.keys(displayEvents).length > 0) {
-                html += '<div><strong style="display: block; margin-bottom: 8px; font-size: 13px;">' + displayTitle + '</strong>';
-                html += '<table class="events-table"><thead><tr><th>Stil</th><th>Mesafe</th><th>Puan</th></tr></thead><tbody>';
+            // Parse combined_events and show all with their points
+            if (athlete.combined_events && Object.keys(athlete.combined_events).length > 0) {
+                const sortedRaces = Object.entries(athlete.combined_events)
+                    .map(([key, points]) => {
+                        const [stroke, distance] = JSON.parse(key);
+                        return { stroke, distance, points };
+                    })
+                    .sort((a, b) => b.points - a.points);
 
-                Object.entries(displayEvents).sort((a, b) => b[1] - a[1]).forEach(([key, points]) => {
-                    const [stroke, distance] = JSON.parse(key);
-                    html += `<tr><td>${stroke}</td><td>${distance}m</td><td><strong>${points}</strong></td></tr>`;
+                // Calculate tiebreaker info (top3, top4, top5, top6)
+                const points = sortedRaces.map(r => r.points);
+                const top3 = points.slice(0, 3).reduce((a, b) => a + b, 0);
+                const top4 = points.slice(0, 4).reduce((a, b) => a + b, 0);
+                const top5 = points.slice(0, 5).reduce((a, b) => a + b, 0);
+                const top6 = points.slice(0, 6).reduce((a, b) => a + b, 0);
+
+                // Tiebreaker info
+                if (top3 > 0) {
+                    html += '<div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 4px; border-left: 3px solid #764ba2;">';
+                    html += '<strong style="font-size: 12px; color: #666; display: block; margin-bottom: 6px;">Sıralama Detayı (Federasyon Karması):</strong>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 13px;">';
+                    html += '<div><span style="color: #666;">Top 3:</span> <strong style="color: #667eea;">' + top3 + '</strong></div>';
+                    if (top4 > top3) html += '<div><span style="color: #666;">Top 4:</span> <strong>' + top4 + '</strong></div>';
+                    if (top5 > top4) html += '<div><span style="color: #666;">Top 5:</span> <strong>' + top5 + '</strong></div>';
+                    if (top6 > top5) html += '<div><span style="color: #666;">Top 6:</span> <strong>' + top6 + '</strong></div>';
+                    html += '</div></div>';
+                }
+
+                html += '<div style="margin-bottom: 10px;">';
+                html += '<strong style="display: block; margin-bottom: 10px; font-size: 14px;">Tüm Yarışmalar (En Yüksek Puanından)</strong>';
+                html += '<table class="events-table" style="width: 100%; border-collapse: collapse;">';
+                html += '<thead><tr style="background: #e8ebf7; border-bottom: 1px solid #ccc;"><th style="text-align: left; padding: 8px;">Stil</th><th style="text-align: left; padding: 8px;">Mesafe</th><th style="text-align: right; padding: 8px;">Puan</th></tr></thead>';
+                html += '<tbody>';
+
+                sortedRaces.forEach((race, idx) => {
+                    const isTop3 = idx < 3 ? 'background: #fff9c4;' : '';
+                    html += `<tr style="border-bottom: 1px solid #eee; ${isTop3}">
+                        <td style="padding: 8px;">${race.stroke}</td>
+                        <td style="padding: 8px;">${race.distance}m</td>
+                        <td style="text-align: right; padding: 8px;"><strong style="color: #667eea; font-size: 14px;">${race.points}</strong></td>
+                    </tr>`;
                 });
 
                 html += '</tbody></table></div>';
             } else {
-                html += '<div style="color: #999; font-size: 12px; margin-top: 10px;">Bu etapta yarışma kaydı yok</div>';
+                html += '<div style="color: #999; font-size: 12px; padding: 10px; background: white; border-radius: 4px;">Yarışma kaydı yok</div>';
             }
 
-            modalBody.innerHTML = html;
-            modal.classList.add('show');
+            html += '</div>';
+            contentCell.innerHTML = html;
+            detailRow.style.display = '';
         }
-
-        function closeAthleteModal() {
-            const modal = document.getElementById('athleteModal');
-            modal.classList.remove('show');
-        }
-
-        // Close modal when clicking outside
-        document.getElementById('athleteModal').addEventListener('click', (e) => {
-            if (e.target.id === 'athleteModal') {
-                closeAthleteModal();
-            }
-        });
     </script>
 </body>
 </html>
