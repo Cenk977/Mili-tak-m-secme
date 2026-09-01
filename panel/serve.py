@@ -487,9 +487,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_error(500, str(e))
 
     def handle_clear(self):
-        """Handle database clear request."""
+        """Handle database clear request - clear both old and federated tables."""
         try:
             clear_athletes()
+            clear_fed_tables()
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
