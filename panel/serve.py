@@ -460,16 +460,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             # Get athlete rankings with full scoring (all legs computed)
             athletes = get_athlete_rankings(birth_year, gender, region)
 
-            # Apply selection status (TR, BÖLGE, Multinations)
-            try:
-                athletes = apply_selection_status(athletes)
-            except Exception as e:
-                logger.warning(f"Selection status calculation failed: {e}")
-                # Fallback: add default fields
-                for a in athletes:
-                    a['selected'] = '-'
-                    a['selected_slot'] = '-'
-                    a['multinations'] = False
+            # Add default selection fields (selection status TBD - needs more work)
+            for a in athletes:
+                a['selected'] = '-'
+                a['selected_slot'] = '-'
+                a['multinations'] = False
 
             # **IMPORTANT: Filter by leg FIRST before processing**
             # Only show athletes that have events for the selected leg
