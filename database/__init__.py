@@ -14,6 +14,8 @@ from database.db import (
     get_athlete_rankings,
     get_fed_results,
     clear_fed_tables,
+    batch_insert_fed_results,
+    batch_insert_fed_athlete_best,
 )
 
 __all__ = [
@@ -31,4 +33,6 @@ __all__ = [
     'get_fed_athlete_best',
     'get_fed_results',
     'clear_fed_tables',
+    'batch_insert_fed_results',
+    'batch_insert_fed_athlete_best',
 ]

@@ -23,7 +23,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from database import (
     init_db, insert_athlete, insert_result, get_athletes_by_filter, clear_athletes,
     get_missing_clubs_from_db, insert_fed_result, insert_fed_athlete_best, get_fed_athlete_best,
-    get_athlete_rankings, get_fed_results, clear_fed_tables
+    get_athlete_rankings, get_fed_results, clear_fed_tables,
+    batch_insert_fed_results, batch_insert_fed_athlete_best
 )
 from modules.lxf_parser import parse_lxf_file, get_birth_year
 from modules.m1_normalize import normalize_for_lookup
@@ -83,7 +84,7 @@ def get_club_override(club_name: str, overrides: dict) -> dict:
 def compute_and_save_best_scores(race_leg: str = 'antalya') -> int:
     """
     Read fed_results, compute best scores per (athlete, stroke, distance),
-    and save to fed_athlete_best. Returns count saved.
+    and save to fed_athlete_best (batch). Returns count saved.
     """
     from collections import defaultdict
 
@@ -96,7 +97,8 @@ def compute_and_save_best_scores(race_leg: str = 'antalya') -> int:
         key = (r['athlete_name'], r['birth_year'], r['gender'], r['stroke'], r['distance'])
         grouped[key].append(r)
 
-    saved_count = 0
+    # Batch collect all best scores to insert
+    best_scores_batch = []
 
     for (athlete_name, birth_year, gender, stroke, distance), group in grouped.items():
         # Find best (lowest) time
@@ -116,7 +118,7 @@ def compute_and_save_best_scores(race_leg: str = 'antalya') -> int:
             logger.warning(f"Error scoring {athlete_name} {birth_year} {gender} {stroke} {distance}: {e}")
             best_points = 0
 
-        # Save to fed_athlete_best
+        # Batch collect best score
         best_dict = {
             'athlete_name': athlete_name,
             'birth_year': birth_year,
@@ -131,11 +133,11 @@ def compute_and_save_best_scores(race_leg: str = 'antalya') -> int:
             'best_time_txt': best_time_txt,
             'best_leg': best_leg,
         }
+        best_scores_batch.append(best_dict)
 
-        if insert_fed_athlete_best(best_dict):
-            saved_count += 1
-
-    logger.info(f"Saved {saved_count} best scores to fed_athlete_best")
+    # Batch insert all best scores at once
+    saved_count = batch_insert_fed_athlete_best(best_scores_batch)
+    logger.info(f"Batch saved {saved_count} best scores to fed_athlete_best")
     return saved_count
 
 
@@ -250,18 +252,25 @@ def normalize_athlete_data(athlete: dict, result: dict, overrides: dict) -> tupl
 def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
     """
     Parse LXF file, normalize, and insert into fed_results table.
-    Pipeline: parse → normalize → fed_results
+    Pipeline: parse → normalize → fed_results (batch)
     """
+    import time
     try:
+        t0_total = time.time()
+
         # Load manual overrides
+        t0 = time.time()
         overrides = load_manual_overrides()
-        logger.info(f"Loaded overrides: {len(overrides.get('name_overrides', []))} names, {len(overrides.get('club_aliases', []))} clubs")
+        logger.info(f"Loaded overrides: {len(overrides.get('name_overrides', []))} names, {len(overrides.get('club_aliases', []))} clubs (took {time.time()-t0:.2f}s)")
 
         # Parse LXF
+        t0 = time.time()
         athletes, results = parse_lxf_file(file_path)
-        logger.info(f"Parsed {len(athletes)} athletes, {len(results)} results from {race_leg}")
+        t_parse = time.time() - t0
+        logger.info(f"Parsed {len(athletes)} athletes, {len(results)} results from {race_leg} (took {t_parse:.2f}s)")
 
-        fed_results_count = 0
+        # Batch collect all fed_results to insert
+        fed_results_batch = []
         fed_athletes = {}  # Track unique athletes for fed_athlete_best later
 
         # Process each athlete
@@ -296,7 +305,7 @@ def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
                     'club': athlete.get('club_name', 'Unknown'),
                 }
 
-            # Insert each result into fed_results
+            # Batch collect each result into fed_results
             for result in athlete_results:
                 fed_result = {
                     'race_leg': race_leg,
@@ -314,14 +323,22 @@ def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
                     'points': None,
                     'source_pdf_seq': None,
                 }
+                fed_results_batch.append(fed_result)
 
-                if insert_fed_result(fed_result):
-                    fed_results_count += 1
-
-        logger.info(f"Inserted {fed_results_count} results into fed_results table")
+        # Batch insert all fed_results at once
+        t0 = time.time()
+        fed_results_count = batch_insert_fed_results(fed_results_batch)
+        t_insert = time.time() - t0
+        logger.info(f"Batch inserted {fed_results_count} results into fed_results table (took {t_insert:.2f}s)")
 
         # Compute and save best scores
+        t0 = time.time()
         best_saved = compute_and_save_best_scores(race_leg)
+        t_best = time.time() - t0
+        logger.info(f"Computed and saved {best_saved} best scores (took {t_best:.2f}s)")
+
+        t_total = time.time() - t0_total
+        logger.info(f"TOTAL UPLOAD PROCESS: {t_total:.2f}s (parse: {t_parse:.2f}s, insert: {t_insert:.2f}s, best: {t_best:.2f}s)")
 
         return {
             "status": "success",
@@ -482,6 +499,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def handle_upload(self):
         """Handle file upload."""
+        import time
+        t0_total = time.time()
         try:
             # Parse multipart form data
             content_length = int(self.headers.get('Content-Length', 0))
@@ -490,7 +509,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 return
 
             # Read content as binary
+            t0 = time.time()
             content = self.rfile.read(content_length)
+            t_read = time.time() - t0
+            logger.info(f"Read {content_length} bytes in {t_read:.2f}s")
 
             # Parse multipart form data (binary-safe)
             # Extract boundary from content-type header
@@ -559,18 +581,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if filename and 'edirne' in filename.lower():
                 race_leg = 'edirne'
 
+            t0 = time.time()
             result = process_lxf_upload(file_content_bytes, race_leg=race_leg)
+            t_process = time.time() - t0
+            logger.info(f"process_lxf_upload took {t_process:.2f}s")
 
             # Clean up temp file
             Path(file_content_bytes).unlink()
 
             # Send response
+            t0 = time.time()
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
 
             response_json = json.dumps(result, ensure_ascii=False)
             self.wfile.write(response_json.encode('utf-8'))
+            t_response = time.time() - t0
+
+            t_total_http = time.time() - t0_total
+            logger.info(f"TOTAL HTTP UPLOAD: {t_total_http:.2f}s (read: {t_read:.2f}s, process: {t_process:.2f}s, response: {t_response:.2f}s)")
 
         except Exception as e:
             logger.error(f"Error handling upload: {e}", exc_info=True)

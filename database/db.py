@@ -501,3 +501,88 @@ def clear_fed_tables() -> bool:
         return False
     finally:
         conn.close()
+
+
+def batch_insert_fed_results(results_list: list) -> int:
+    """Batch insert multiple fed_results records (FAST)."""
+    if not results_list:
+        return 0
+
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN TRANSACTION")
+        count = 0
+        for result_dict in results_list:
+            conn.execute("""
+                INSERT OR REPLACE INTO fed_results (
+                    race_leg, race_date, athlete_name, birth_year, gender,
+                    region, city, club, stroke, distance,
+                    time_text, time_seconds, points, source_pdf_seq
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                result_dict.get('race_leg', 'antalya'),
+                result_dict.get('race_date'),
+                result_dict.get('athlete_name'),
+                result_dict.get('birth_year'),
+                result_dict.get('gender'),
+                result_dict.get('region', 0),
+                result_dict.get('city'),
+                result_dict.get('club'),
+                result_dict.get('stroke'),
+                result_dict.get('distance'),
+                result_dict.get('time_text'),
+                result_dict.get('time_seconds'),
+                result_dict.get('points'),
+                result_dict.get('source_pdf_seq'),
+            ))
+            count += 1
+
+        conn.commit()
+        return count
+    except Exception as e:
+        conn.rollback()
+        print(f"Error batch inserting fed_results: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def batch_insert_fed_athlete_best(best_list: list) -> int:
+    """Batch insert multiple fed_athlete_best records (FAST)."""
+    if not best_list:
+        return 0
+
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN TRANSACTION")
+        count = 0
+        for best_dict in best_list:
+            conn.execute("""
+                INSERT OR REPLACE INTO fed_athlete_best (
+                    athlete_name, birth_year, gender, region, city, club,
+                    stroke, distance, best_points, best_time_sec, best_time_txt, best_leg
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                best_dict.get('athlete_name'),
+                best_dict.get('birth_year'),
+                best_dict.get('gender'),
+                best_dict.get('region', 0),
+                best_dict.get('city'),
+                best_dict.get('club'),
+                best_dict.get('stroke'),
+                best_dict.get('distance'),
+                best_dict.get('best_points'),
+                best_dict.get('best_time_sec'),
+                best_dict.get('best_time_txt'),
+                best_dict.get('best_leg'),
+            ))
+            count += 1
+
+        conn.commit()
+        return count
+    except Exception as e:
+        conn.rollback()
+        print(f"Error batch inserting fed_athlete_best: {e}")
+        return 0
+    finally:
+        conn.close()

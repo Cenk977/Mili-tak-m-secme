@@ -7,7 +7,15 @@
       "Bash(python3 -c \"from config import DB_PATH; print\\(f'DB Path: {DB_PATH}'\\)\")",
       "Bash(rm -f /tmp/debug.txt)",
       "Bash(curl -s \"http://localhost:8765/api/ranking?birth_year=2013&gender=F&leg=edirne\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "PowerShell(ls \"C:\\\\Users\\\\PC\\\\OneDrive - TED BURSA KOLEJİ\\\\Masaüstü\\\\Mili_takım_secme\\\\data\" | Where-Object {$_.Extension -in '.lxf','.xml'} | Select-Object Name, @{N=\"Size\\(MB\\)\";E={[math]::Round\\($_.Length/1MB, 2\\)}})",
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Name python -Force -ErrorAction SilentlyContinue)",
+      "Bash(time curl -s -X POST -F file=@data/antalya_millitakim_secme_sonuc.lxf http://localhost:8765/upload)",
+      "Bash(time curl -s \"http://localhost:8765/api/ranking?leg=antalya&sort=top3\")",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s \"http://localhost:8765/api/ranking?leg=antalya&sort=top3\")",
+      "Bash(curl -s \"http://localhost:8765/\")"
     ]
   }
 }
