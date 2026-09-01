@@ -424,23 +424,29 @@ def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int
     for (athlete_name, birth_year, gender), info in by_athlete.items():
         # Score Antalya races
         antalya_events: dict[tuple, int] = {}
+        antalya_events_time: dict[tuple, str] = {}
         for r in info['antalya_races']:
             if r['time_seconds'] is not None:
                 try:
                     pts = score_event(r['time_seconds'], birth_year, gender, r['stroke'], r['distance'])
                     key = (r['stroke'], r['distance'])
-                    antalya_events[key] = max(antalya_events.get(key, 0), pts)
+                    if pts > antalya_events.get(key, 0):
+                        antalya_events[key] = pts
+                        antalya_events_time[key] = r.get('time_text', '-')
                 except:
                     pass
 
         # Score Edirne races
         edirne_events: dict[tuple, int] = {}
+        edirne_events_time: dict[tuple, str] = {}
         for r in info['edirne_races']:
             if r['time_seconds'] is not None:
                 try:
                     pts = score_event(r['time_seconds'], birth_year, gender, r['stroke'], r['distance'])
                     key = (r['stroke'], r['distance'])
-                    edirne_events[key] = max(edirne_events.get(key, 0), pts)
+                    if pts > edirne_events.get(key, 0):
+                        edirne_events[key] = pts
+                        edirne_events_time[key] = r.get('time_text', '-')
                 except:
                     pass
 
@@ -448,8 +454,15 @@ def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int
         antalya_top3 = sum(best_scores_sequence(antalya_events)[:3]) if antalya_events else 0
         edirne_top3 = sum(best_scores_sequence(edirne_events)[:3]) if edirne_events else 0
 
-        # Merge for combined
+        # Merge for combined (use edirne time if higher points, else antalya)
         combined_events = merge_scores(antalya_events, edirne_events)
+        combined_events_time = {}
+        for key in combined_events:
+            if key in edirne_events and edirne_events[key] == combined_events[key]:
+                combined_events_time[key] = edirne_events_time.get(key, '-')
+            else:
+                combined_events_time[key] = antalya_events_time.get(key, '-')
+
         combined_top3 = sum(best_scores_sequence(combined_events)[:3]) if combined_events else 0
         combined_key = compute_ranking_key(combined_events) if combined_events else ()
 
@@ -461,8 +474,11 @@ def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int
             'city': info['city'],
             'club': info['club'],
             'antalya_events': antalya_events,
+            'antalya_events_time': antalya_events_time,
             'edirne_events': edirne_events,
+            'edirne_events_time': edirne_events_time,
             'combined_events': combined_events,
+            'combined_events_time': combined_events_time,
             'antalya_top3': antalya_top3,
             'edirne_top3': edirne_top3,
             'combined_top3': combined_top3,

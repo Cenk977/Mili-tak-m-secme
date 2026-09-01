@@ -146,12 +146,30 @@ def apply_selection_status(athletes: list) -> list:
     """
     Apply selection status using rank_group logic.
     Adds 'selected', 'multinations', 'selected_slot' fields to each athlete.
+    DEPRECATED: Use apply_selection_status_with_points() instead.
+    """
+    return apply_selection_status_with_points(athletes)
+
+
+def apply_selection_status_with_points(athletes: list) -> list:
+    """
+    Apply selection status using rank_group logic.
+    Handles events dict with time information.
+    Adds 'selected', 'multinations', 'selected_slot' fields to each athlete.
     """
     from collections import defaultdict
 
-    # Prepare athletes for rank_group: add event_scores = combined_events
+    # Prepare athletes for rank_group: add event_scores = points only from combined_events
     for a in athletes:
-        a['event_scores'] = a.get('combined_events', {})
+        # Use combined_events_for_ranking if available, else extract from combined_events
+        if 'combined_events_for_ranking' in a:
+            a['event_scores'] = a.get('combined_events_for_ranking', {})
+        else:
+            combined_events_points = {}
+            for (stroke, dist), data in a.get('combined_events', {}).items():
+                points = data.get('points', 0) if isinstance(data, dict) else data
+                combined_events_points[(stroke, dist)] = points
+            a['event_scores'] = combined_events_points
         a['name'] = a.get('athlete_name', '')
 
     # Group by birth_year and gender (like rank_all does)
@@ -470,7 +488,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             # Apply selection status BEFORE converting to JSON (tuple keys needed)
             try:
-                athletes = apply_selection_status(athletes)
+                # Extract points only from combined_events for rank_group (ignore time)
+                for a in athletes:
+                    combined_events_points_only = {}
+                    for (stroke, dist), data in a.get('combined_events', {}).items():
+                        points = data.get('points', 0) if isinstance(data, dict) else data
+                        combined_events_points_only[(stroke, dist)] = points
+                    a['combined_events_for_ranking'] = combined_events_points_only
+
+                athletes = apply_selection_status_with_points(athletes)
             except Exception as e:
                 logger.warning(f"Error applying selection status: {e}")
                 # Fallback: set default values
@@ -490,17 +516,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 else:  # combined
                     display_top3 = athlete['combined_top3']
 
-                # Convert events dicts: tuples → JSON arrays
-                def events_to_json(events_dict):
+                # Convert events dicts: tuples → JSON arrays, include time
+                def events_to_json(events_dict, times_dict=None):
                     result = {}
                     for (stroke, distance), points in events_dict.items():
                         key = json.dumps([stroke, distance])
-                        result[key] = points
+                        time_text = times_dict.get((stroke, distance), '-') if times_dict else '-'
+                        result[key] = {'points': points, 'time': time_text}
                     return result
 
-                antalya_events_json = events_to_json(athlete['antalya_events'])
-                edirne_events_json = events_to_json(athlete['edirne_events'])
-                combined_events_json = events_to_json(athlete['combined_events'])
+                antalya_events_json = events_to_json(athlete['antalya_events'], athlete.get('antalya_events_time', {}))
+                edirne_events_json = events_to_json(athlete['edirne_events'], athlete.get('edirne_events_time', {}))
+                combined_events_json = events_to_json(athlete['combined_events'], athlete.get('combined_events_time', {}))
 
                 response_athletes.append({
                     'athlete_name': athlete['athlete_name'],
