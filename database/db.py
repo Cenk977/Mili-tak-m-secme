@@ -364,10 +364,12 @@ def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int
     Returns one row per athlete with: athlete_name, birth_year, gender, region, city, club,
     all_events (dict), top3_total (Antalya/Edirne/Combined), ranking_key (tiebreaker tuple).
 
-    Note: leg parameter is ignored; always computes all three legs' scores for complete data.
+    Note: Only includes athletes from birth years with valid scoring tables (2011-2013).
+    leg parameter is ignored; always computes all three legs' scores for complete data.
     """
     from collections import defaultdict
     from federasyon.scorer import score_event, merge_scores, best_scores_sequence, compute_ranking_key
+    from federasyon.scoring_tables import TABLES
 
     conn = get_connection()
 
@@ -391,6 +393,10 @@ def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int
         results = [dict(row) for row in rows]
     finally:
         conn.close()
+
+    # Filter: only keep athletes with birth_years that have scoring tables
+    valid_years = set(TABLES.keys())
+    results = [r for r in results if r['birth_year'] in valid_years]
 
     # Group by athlete (athlete_name, birth_year, gender)
     by_athlete = defaultdict(lambda: {
