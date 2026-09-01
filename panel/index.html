@@ -694,7 +694,7 @@
 
                 // Populate detail content if still shows loading
                 const contentDiv = detailRow.querySelector('.detail-content');
-                if (contentDiv && contentDiv.textContent.includes('Yüклениyor')) {
+                if (contentDiv && contentDiv.textContent.includes('Yükleniyor')) {
                     const athlete = window.athletesData.find(a =>
                         a.athlete_name === athleteName
                     );
@@ -838,7 +838,7 @@
             container.innerHTML = sorted.map((athlete, idx) => {
                 const ranking = idx + 1;
                 const badge = getRankingBadge(ranking);
-                const status = getSelectionBadgeStatus(athlete.selected);
+                const badgeStatus = athlete.multinations ? 'MULTINATIONS' : (athlete.selected || 'BARAJ_YOK');
                 const multinationsIndicator = athlete.multinations
                     ? '<span style="margin-left: 5px; font-size: 16px;">⭐</span>'
                     : '';
@@ -857,7 +857,7 @@
                         </div>
                         <div class="col-stats">
                             <span class="points"><strong>${points}</strong></span>
-                            <span class="selection-badge" data-status="${status}" style="background: ${status === 'TR' ? '#fff59d' : status === 'BÖLGE' ? '#c5e1a5' : '#f0f0f0'}; padding: 4px 8px; border-radius: 4px; font-weight: 600; color: ${status === 'TR' ? '#f57f17' : status === 'BÖLGE' ? '#558b2f' : '#666'};">
+                            <span class="selection-badge" data-status="${badgeStatus}">
                                 ${athlete.selected_slot || '-'}
                             </span>
                             <span class="age-gender">${age} ${genderText}</span>
