@@ -422,7 +422,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith('/api/ranking'):
             self.serve_api_ranking()
         else:
-            self.send_error(404, "Not found")
+            self.serve_static_file()
 
     def do_POST(self):
         """Handle POST requests."""
@@ -447,6 +447,60 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.wfile.write(html.encode('utf-8'))
         except FileNotFoundError:
             self.send_error(404, "index.html not found")
+
+    def serve_static_file(self):
+        """Serve static files from panel directory (CSS, JS, etc)."""
+        # Remove leading slash and prevent directory traversal
+        file_path = self.path.lstrip('/')
+        if '..' in file_path or file_path.startswith('/'):
+            self.send_error(403, "Forbidden")
+            return
+
+        file_full_path = Path(__file__).parent / file_path
+
+        # Check if file exists and is in the panel directory
+        try:
+            file_full_path = file_full_path.resolve()
+            panel_dir = Path(__file__).parent.resolve()
+            if not str(file_full_path).startswith(str(panel_dir)):
+                self.send_error(403, "Forbidden")
+                return
+        except (OSError, ValueError):
+            self.send_error(403, "Forbidden")
+            return
+
+        if not file_full_path.exists() or not file_full_path.is_file():
+            self.send_error(404, "Not found")
+            return
+
+        try:
+            with open(file_full_path, 'rb') as f:
+                content = f.read()
+
+            # Determine content type
+            content_type = 'application/octet-stream'
+            if file_path.endswith('.css'):
+                content_type = 'text/css; charset=utf-8'
+            elif file_path.endswith('.js'):
+                content_type = 'application/javascript; charset=utf-8'
+            elif file_path.endswith('.html'):
+                content_type = 'text/html; charset=utf-8'
+            elif file_path.endswith('.json'):
+                content_type = 'application/json; charset=utf-8'
+            elif file_path.endswith('.png'):
+                content_type = 'image/png'
+            elif file_path.endswith('.jpg') or file_path.endswith('.jpeg'):
+                content_type = 'image/jpeg'
+            elif file_path.endswith('.svg'):
+                content_type = 'image/svg+xml'
+
+            self.send_response(200)
+            self.send_header('Content-type', content_type)
+            self.send_header('Content-length', len(content))
+            self.end_headers()
+            self.wfile.write(content)
+        except IOError:
+            self.send_error(500, "Error reading file")
 
     def serve_api_ranking(self):
         """Serve ranking API endpoint."""
