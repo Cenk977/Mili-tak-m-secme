@@ -692,6 +692,7 @@
                     '<th>Cinsiyet</th>' +
                     '<th>Skor</th>' +
                     '<th>Seçim</th>' +
+                    '<th>Seçim Sırası</th>' +
                     '</tr></thead><tbody>';
 
                 athletes.forEach((athlete, idx) => {
@@ -711,6 +712,7 @@
                         '<span style="color: #999;">Bilinmiyor</span>';
 
                     const athleteKey = `athlete-${idx}`;
+                    const selectedSlot = athlete.selected_slot || '-';
                     html += `<tr class="athlete-row" onclick="toggleAthleteDetail('${athleteKey}', ${JSON.stringify(athlete).replace(/"/g, '&quot;')})">
                         <td class="cursor-pointer"><strong>${name}</strong></td>
                         <td>${club}</td>
@@ -720,6 +722,7 @@
                         <td>${gender}</td>
                         <td>${score}</td>
                         <td>${selectionBadge}</td>
+                        <td><strong style="color: #764ba2;">${selectedSlot}</strong></td>
                     </tr>
                     <tr class="athlete-detail-row" id="detail-${athleteKey}" style="display: none;">
                         <td colspan="8" id="detail-content-${athleteKey}"></td>
