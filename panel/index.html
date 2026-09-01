@@ -488,36 +488,37 @@
                 </div>
             </div>
 
-            <!-- Filters & Actions -->
+            <!-- Filter Bar -->
             <div class="section">
                 <div class="section-title">Filtreler</div>
-                <div class="filters">
-                    <div class="filter-group">
-                        <label for="birthYear">Doğum Yılı:</label>
-                        <input type="number" id="birthYear" placeholder="Tümü" min="1990" max="2020">
-                    </div>
-                    <div class="filter-group">
-                        <label for="gender">Cinsiyet:</label>
-                        <select id="gender">
-                            <option value="">Tümü</option>
-                            <option value="M">Erkek</option>
-                            <option value="F">Kız</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label for="region">Bölge:</label>
-                        <select id="region">
-                            <option value="">Tümü</option>
-                            <option value="1">İstanbul</option>
-                            <option value="2">Marmara</option>
-                            <option value="3">Ege</option>
-                            <option value="4">İç Anadolu</option>
-                            <option value="5">Karadeniz</option>
-                            <option value="6">Güneydoğu</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary" onclick="loadRankings()">Filtrele</button>
-                    <button class="btn btn-danger" onclick="clearDatabase()">Veritabanını Temizle</button>
+                <div class="filter-bar">
+                    <input
+                        type="search"
+                        id="athlete-search"
+                        class="athlete-search"
+                        placeholder="Sporcu adı ara..."
+                        autocomplete="off"
+                    >
+                    <select id="birth-year-filter" class="birth-year-filter">
+                        <option value="">Doğum Yılı</option>
+                        <option value="2011">2011</option>
+                        <option value="2012">2012</option>
+                        <option value="2013">2013</option>
+                        <option value="2009">2009</option>
+                        <option value="2010">2010</option>
+                        <option value="2014">2014</option>
+                    </select>
+                    <select id="gender-filter" class="gender-filter">
+                        <option value="">Cinsiyet</option>
+                        <option value="F">Kadın</option>
+                        <option value="M">Erkek</option>
+                    </select>
+                    <select id="leg-filter" class="leg-filter">
+                        <option value="">Leg</option>
+                        <option value="antalya">Antalya</option>
+                        <option value="edirne">Edirne</option>
+                        <option value="combined">Combined</option>
+                    </select>
                 </div>
             </div>
 
@@ -526,11 +527,27 @@
                 <div class="stats" id="stats"></div>
             </div>
 
-            <!-- Results Table -->
+            <!-- Athletes List -->
             <div class="section">
                 <div class="section-title">Sonuçlar</div>
-                <div id="resultsContainer">
-                    <div class="empty">Yarışma sonuç dosyası yükleme işlemini başlayın</div>
+                <div id="athletes-list" class="athletes-list">
+                    <div class="list-header">
+                        <div class="col-badge">Sıra</div>
+                        <div class="col-name">Sporcu</div>
+                        <div class="col-info">Şehir (Kulüp)</div>
+                        <div class="col-stats">Puan | Seçim | Yaş/Cinsiyet</div>
+                        <div class="col-action"></div>
+                    </div>
+                    <!-- Athlete rows will be populated by JavaScript in Task 3 -->
+                    <div id="athletes-container"></div>
+                </div>
+
+                <div id="loading" style="display:none; text-align: center; padding: 20px;">
+                    <p>Sporcular yükleniyor...</p>
+                </div>
+
+                <div id="no-results" class="no-results" style="display:none;">
+                    Arama kriterlerine uygun sporcu bulunamadı.
                 </div>
             </div>
         </div>
