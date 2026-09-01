@@ -647,7 +647,14 @@
             });
         }
 
-        // Load rankings
+        // TODO: Task 3 - Replace with new DIV-based rendering
+        // Old table-based rendering commented out. Task 3 will implement:
+        // - renderAthletes() function to populate #athletes-container with .athlete-row divs
+        // - Detail row expansion logic
+        // - Real-time search filtering on #athlete-search input
+        // - Event listeners for filter inputs (birth-year-filter, gender-filter, leg-filter)
+        // The API fetch structure remains the same; only rendering changes from <table> to DIVs
+        /*
         async function loadRankings() {
             const birthYear = document.getElementById('birthYear').value || null;
             const gender = document.getElementById('gender').value || null;
@@ -753,6 +760,13 @@
                 resultsContainer.innerHTML = `<div class="empty">Hata: ${error.message}</div>`;
             }
         }
+        */
+
+        // Stub function for Task 3 - prevents errors when called from upload handler
+        async function loadRankings() {
+            console.log('loadRankings() stubbed - awaiting Task 3 implementation');
+            // Task 3 will replace this with actual rendering logic
+        }
 
         // Clear database
         function clearDatabase() {
@@ -765,7 +779,9 @@
                 .then(() => {
                     uploadStatus.classList.add('show', 'success');
                     uploadStatus.textContent = '✓ Veritabanı temizlendi';
-                    document.getElementById('resultsContainer').innerHTML = '<div class="empty">Yarışma sonuç dosyası yükleme işlemini başlayın</div>';
+                    // Task 3: Clear athletes container and hide results
+                    document.getElementById('athletes-container').innerHTML = '';
+                    document.getElementById('athletes-list').style.display = 'none';
                     document.getElementById('statsSection').style.display = 'none';
                 })
                 .catch(error => {
