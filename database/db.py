@@ -4,6 +4,7 @@ SQLite3 backend, UTF-8 encoding
 """
 
 import sqlite3
+import hashlib
 from pathlib import Path
 from config import DB_PATH
 
@@ -498,7 +499,13 @@ def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int
         combined_top3 = sum(best_scores_sequence(combined_events)[:3]) if combined_events else 0
         combined_key = compute_ranking_key(combined_events) if combined_events else ()
 
+        # Generate deterministic athlete_id for yíldízlar selection
+        athlete_id = hashlib.md5(
+            f"{athlete_name}_{birth_year}_{gender}".encode()
+        ).hexdigest()[:8]
+
         rankings.append({
+            'athlete_id': athlete_id,
             'athlete_name': athlete_name,
             'birth_year': birth_year,
             'gender': gender,
