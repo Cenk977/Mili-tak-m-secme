@@ -35,6 +35,7 @@ from federasyon.scorer import score_event, score_athlete_row, merge_scores, best
 from federasyon.ranker import rank_all, rank_group
 from federasyon.multinations import is_multinations
 from config import DB_PATH, TARGET_AGE_GROUPS, COMPETITION_YEAR
+from panel.export import create_rankings_xlsx
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -423,6 +424,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.serve_api_ranking()
         elif self.path.startswith('/api/regional'):
             self.serve_api_regional()
+        elif self.path.startswith('/api/export'):
+            self.handle_export()
         else:
             self.serve_static_file()
 
@@ -694,6 +697,92 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Error in /api/regional: {e}", exc_info=True)
+            self.send_error(500, str(e))
+
+    def handle_export(self):
+        """Handle export request - generate and return XLSX file."""
+        try:
+            # Parse query params
+            qs = urlparse(self.path).query
+            params = parse_qs(qs)
+
+            leg = params.get('leg', ['combined'])[0]
+            birth_year = None
+            gender = None
+
+            if 'birth_year' in params:
+                try:
+                    birth_year = int(params['birth_year'][0])
+                except ValueError:
+                    pass
+
+            if 'gender' in params:
+                gender = params['gender'][0] if params['gender'][0] else None
+
+            # Get athlete rankings
+            athletes = get_athlete_rankings(birth_year, gender, None)
+
+            # Filter by leg
+            if leg == 'antalya':
+                athletes = [a for a in athletes if len(a['antalya_events']) > 0]
+            elif leg == 'edirne':
+                athletes = [a for a in athletes if len(a['edirne_events']) > 0]
+
+            # Apply selection status BEFORE converting to JSON (tuple keys needed)
+            try:
+                # Extract points only from combined_events for rank_group (ignore time)
+                for a in athletes:
+                    combined_events_points_only = {}
+                    for (stroke, dist), data in a.get('combined_events', {}).items():
+                        points = data.get('points', 0) if isinstance(data, dict) else data
+                        combined_events_points_only[(stroke, dist)] = points
+                    a['combined_events_for_ranking'] = combined_events_points_only
+
+                athletes = apply_selection_status_with_points(athletes)
+            except Exception as e:
+                logger.warning(f"Error applying selection status: {e}")
+                # Fallback: set default values
+                for a in athletes:
+                    a['selected'] = '-'
+                    a['selected_slot'] = '-'
+                    a['multinations'] = False
+
+            # Sort and prepare for export
+            athletes_for_export = []
+            for idx, athlete in enumerate(athletes, 1):
+                if leg == 'antalya':
+                    display_top3 = athlete['antalya_top3']
+                elif leg == 'edirne':
+                    display_top3 = athlete['edirne_top3']
+                else:
+                    display_top3 = athlete['combined_top3']
+
+                athletes_for_export.append({
+                    'athlete_name': athlete['athlete_name'],
+                    'birth_year': athlete['birth_year'],
+                    'gender': athlete['gender'],
+                    'city': athlete['city'],
+                    'region': athlete['region'],
+                    'display_top3': display_top3,
+                    'selected': athlete.get('selected', '-'),
+                })
+
+            # Generate XLSX
+            xlsx_bytes = create_rankings_xlsx(athletes_for_export, leg)
+
+            # Send file
+            self.send_response(200)
+            self.send_header('Content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            self.send_header('Content-Disposition', f'attachment; filename="siralama_{leg}.xlsx"')
+            self.send_header('Content-Length', len(xlsx_bytes))
+            self.end_headers()
+
+            self.wfile.write(xlsx_bytes)
+
+            logger.info(f"Exported {len(athletes_for_export)} athletes to Excel ({leg})")
+
+        except Exception as e:
+            logger.error(f"Error exporting: {e}", exc_info=True)
             self.send_error(500, str(e))
 
     def handle_clear(self):

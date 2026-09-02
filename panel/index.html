@@ -455,6 +455,26 @@
         .cursor-pointer:hover {
             color: #764ba2;
         }
+
+        .action-btn {
+            padding: 10px 16px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+
+        .action-btn:hover {
+            background: #229954;
+        }
+
+        .action-btn:active {
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -517,6 +537,9 @@
                         <option value="edirne">Edirne</option>
                         <option value="combined">Combined</option>
                     </select>
+                    <button id="exportBtn" class="action-btn">
+                      📥 Excel'e İndir
+                    </button>
                 </div>
             </div>
 
@@ -1092,6 +1115,27 @@
                     loadRankings();
                 });
             }
+
+            // Export button handler
+            document.getElementById('exportBtn').addEventListener('click', async function() {
+                try {
+                    const birthYear = document.getElementById('birth-year-filter')?.value || '';
+                    const gender = document.getElementById('gender-filter')?.value || '';
+                    const leg = document.querySelector('.leg-btn.active')?.dataset.leg || 'combined';
+
+                    // Build export URL
+                    let url = `/api/export?leg=${leg}`;
+                    if (birthYear) url += `&birth_year=${birthYear}`;
+                    if (gender) url += `&gender=${gender}`;
+
+                    // Trigger download
+                    window.location.href = url;
+
+                } catch (error) {
+                    console.error('Export error:', error);
+                    alert('İhraç başarısız');
+                }
+            });
 
             // Regional ranking tab handlers
             document.querySelectorAll('.region-tab').forEach(tab => {
