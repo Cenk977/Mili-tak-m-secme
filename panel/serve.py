@@ -428,6 +428,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         """Handle POST requests."""
         if self.path == '/upload':
             self.handle_upload()
+        elif self.path == '/api/delete-leg':
+            self.handle_delete_leg()
         elif self.path == '/clear':
             self.handle_clear()
         else:
@@ -624,6 +626,56 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"status": "success"}, ensure_ascii=False).encode('utf-8'))
         except Exception as e:
+            self.send_error(500, str(e))
+
+    def handle_delete_leg(self):
+        """Delete all results for a specific race leg."""
+        try:
+            # Read JSON body
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length == 0:
+                self.send_error(400, "Empty body")
+                return
+
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            leg = data.get('leg', '').lower()
+
+            if leg not in ['antalya', 'edirne']:
+                self.send_error(400, "Invalid leg. Must be 'antalya' or 'edirne'")
+                return
+
+            # Delete from both tables
+            import sqlite3
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+
+            cursor.execute("DELETE FROM fed_results WHERE race_leg = ?", (leg,))
+            deleted_results = cursor.rowcount
+
+            cursor.execute("DELETE FROM fed_athlete_best WHERE best_leg = ?", (leg,))
+            deleted_best = cursor.rowcount
+
+            conn.commit()
+            conn.close()
+
+            total_deleted = deleted_results + deleted_best
+            logger.info(f"Deleted {deleted_results} results and {deleted_best} best scores for leg '{leg}'")
+
+            # Send success response
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.end_headers()
+
+            response = {
+                "status": "success",
+                "message": f"Deleted all results for {leg}",
+                "deleted_count": total_deleted
+            }
+            self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+
+        except Exception as e:
+            logger.error(f"Error deleting leg: {e}", exc_info=True)
             self.send_error(500, str(e))
 
     def handle_upload(self):
