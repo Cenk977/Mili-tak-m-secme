@@ -40,7 +40,17 @@ def init_db():
             selected BOOLEAN DEFAULT 0,
             selection_type TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            selected_yildiz_multinations BOOLEAN DEFAULT 0,
+            coach_called_yildiz_multinations BOOLEAN DEFAULT 0,
+            selected_yildiz_comen_cup_aralik BOOLEAN DEFAULT 0,
+            selected_yildiz_comen_cup_nisan BOOLEAN DEFAULT 0,
+            coach_called_yildiz_comen_cup_aralik BOOLEAN DEFAULT 0,
+            coach_called_yildiz_comen_cup_nisan BOOLEAN DEFAULT 0,
+            selected_yildiz_central_europe_aralik BOOLEAN DEFAULT 0,
+            selected_yildiz_central_europe_nisan BOOLEAN DEFAULT 0,
+            coach_called_yildiz_central_europe_aralik BOOLEAN DEFAULT 0,
+            coach_called_yildiz_central_europe_nisan BOOLEAN DEFAULT 0
         )
     """)
 
@@ -113,6 +123,28 @@ def init_db():
             PRIMARY KEY(athlete_name, birth_year, stroke, distance)
         )
     """)
+
+    # Migration: Add yildizlar selection columns to athletes table (if they don't exist)
+    migration_columns = [
+        "selected_yildiz_multinations BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_multinations BOOLEAN DEFAULT 0",
+        "selected_yildiz_comen_cup_aralik BOOLEAN DEFAULT 0",
+        "selected_yildiz_comen_cup_nisan BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_comen_cup_aralik BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_comen_cup_nisan BOOLEAN DEFAULT 0",
+        "selected_yildiz_central_europe_aralik BOOLEAN DEFAULT 0",
+        "selected_yildiz_central_europe_nisan BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_central_europe_aralik BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_central_europe_nisan BOOLEAN DEFAULT 0"
+    ]
+
+    for column_def in migration_columns:
+        column_name = column_def.split()[0]
+        try:
+            cursor.execute(f"ALTER TABLE athletes ADD COLUMN {column_def}")
+        except sqlite3.OperationalError:
+            # Column already exists, skip
+            pass
 
     conn.commit()
     conn.close()
