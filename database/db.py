@@ -4,6 +4,7 @@ SQLite3 backend, UTF-8 encoding
 """
 
 import sqlite3
+import hashlib
 from pathlib import Path
 from config import DB_PATH
 
@@ -40,7 +41,17 @@ def init_db():
             selected BOOLEAN DEFAULT 0,
             selection_type TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            selected_yildiz_multinations BOOLEAN DEFAULT 0,
+            coach_called_yildiz_multinations BOOLEAN DEFAULT 0,
+            selected_yildiz_comen_cup_aralik BOOLEAN DEFAULT 0,
+            selected_yildiz_comen_cup_nisan BOOLEAN DEFAULT 0,
+            coach_called_yildiz_comen_cup_aralik BOOLEAN DEFAULT 0,
+            coach_called_yildiz_comen_cup_nisan BOOLEAN DEFAULT 0,
+            selected_yildiz_central_europe_aralik BOOLEAN DEFAULT 0,
+            selected_yildiz_central_europe_nisan BOOLEAN DEFAULT 0,
+            coach_called_yildiz_central_europe_aralik BOOLEAN DEFAULT 0,
+            coach_called_yildiz_central_europe_nisan BOOLEAN DEFAULT 0
         )
     """)
 
@@ -72,6 +83,69 @@ def init_db():
             synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Federation scoring: raw results (used for scoring)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fed_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            race_leg TEXT NOT NULL,
+            race_date TEXT,
+            athlete_name TEXT NOT NULL,
+            birth_year INTEGER NOT NULL,
+            gender TEXT NOT NULL,
+            region INTEGER,
+            city TEXT,
+            club TEXT,
+            stroke TEXT NOT NULL,
+            distance INTEGER NOT NULL,
+            time_text TEXT,
+            time_seconds REAL,
+            points INTEGER,
+            source_pdf_seq INTEGER,
+            UNIQUE(race_leg, athlete_name, birth_year, stroke, distance)
+        )
+    """)
+
+    # Federation scoring: best per event (materialized from fed_results)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fed_athlete_best (
+            athlete_name TEXT NOT NULL,
+            birth_year INTEGER NOT NULL,
+            gender TEXT NOT NULL,
+            region INTEGER,
+            city TEXT,
+            club TEXT,
+            stroke TEXT NOT NULL,
+            distance INTEGER NOT NULL,
+            best_points INTEGER,
+            best_time_sec REAL,
+            best_time_txt TEXT,
+            best_leg TEXT,
+            PRIMARY KEY(athlete_name, birth_year, stroke, distance)
+        )
+    """)
+
+    # Migration: Add yildizlar selection columns to athletes table (if they don't exist)
+    migration_columns = [
+        "selected_yildiz_multinations BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_multinations BOOLEAN DEFAULT 0",
+        "selected_yildiz_comen_cup_aralik BOOLEAN DEFAULT 0",
+        "selected_yildiz_comen_cup_nisan BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_comen_cup_aralik BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_comen_cup_nisan BOOLEAN DEFAULT 0",
+        "selected_yildiz_central_europe_aralik BOOLEAN DEFAULT 0",
+        "selected_yildiz_central_europe_nisan BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_central_europe_aralik BOOLEAN DEFAULT 0",
+        "coach_called_yildiz_central_europe_nisan BOOLEAN DEFAULT 0"
+    ]
+
+    for column_def in migration_columns:
+        column_name = column_def.split()[0]
+        try:
+            cursor.execute(f"ALTER TABLE athletes ADD COLUMN {column_def}")
+        except sqlite3.OperationalError:
+            # Column already exists, skip
+            pass
 
     conn.commit()
     conn.close()
@@ -147,7 +221,7 @@ def get_athletes_by_filter(birth_year: int = None, gender: str = None) -> list:
     Returns list of dicts with all columns.
     """
     conn = get_connection()
-    query = "SELECT * FROM athletes WHERE selected = 1"
+    query = "SELECT * FROM athletes WHERE 1=1"
     params = []
 
     if birth_year:
@@ -201,8 +275,10 @@ def clear_athletes() -> bool:
     """Delete all athlete records (for re-import)."""
     conn = get_connection()
     try:
-        conn.execute("DELETE FROM athletes")
+        # Delete results first (has foreign key to athletes)
         conn.execute("DELETE FROM results")
+        # Then delete athletes
+        conn.execute("DELETE FROM athletes")
         conn.commit()
         return True
     except Exception as e:
@@ -222,5 +298,351 @@ def get_missing_clubs_from_db() -> list:
             ORDER BY club_name
         """)
         return [row[0] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def insert_fed_result(result_dict: dict) -> bool:
+    """Insert federation result into fed_results table."""
+    conn = get_connection()
+    try:
+        conn.execute("""
+            INSERT OR REPLACE INTO fed_results (
+                race_leg, race_date, athlete_name, birth_year, gender,
+                region, city, club, stroke, distance,
+                time_text, time_seconds, points, source_pdf_seq
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            result_dict.get('race_leg', 'antalya'),
+            result_dict.get('race_date'),
+            result_dict.get('athlete_name'),
+            result_dict.get('birth_year'),
+            result_dict.get('gender'),
+            result_dict.get('region', 0),
+            result_dict.get('city'),
+            result_dict.get('club'),
+            result_dict.get('stroke'),
+            result_dict.get('distance'),
+            result_dict.get('time_text'),
+            result_dict.get('time_seconds'),
+            result_dict.get('points'),
+            result_dict.get('source_pdf_seq'),
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error inserting fed_result: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def insert_fed_athlete_best(best_dict: dict) -> bool:
+    """Insert or update federation athlete best into fed_athlete_best table."""
+    conn = get_connection()
+    try:
+        conn.execute("""
+            INSERT OR REPLACE INTO fed_athlete_best (
+                athlete_name, birth_year, gender, region, city, club,
+                stroke, distance, best_points, best_time_sec, best_time_txt, best_leg
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            best_dict.get('athlete_name'),
+            best_dict.get('birth_year'),
+            best_dict.get('gender'),
+            best_dict.get('region', 0),
+            best_dict.get('city'),
+            best_dict.get('club'),
+            best_dict.get('stroke'),
+            best_dict.get('distance'),
+            best_dict.get('best_points'),
+            best_dict.get('best_time_sec'),
+            best_dict.get('best_time_txt'),
+            best_dict.get('best_leg'),
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error inserting fed_athlete_best: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_fed_athlete_best(birth_year: int = None, gender: str = None) -> list:
+    """Get fed_athlete_best filtered by birth_year and/or gender."""
+    conn = get_connection()
+    query = "SELECT * FROM fed_athlete_best WHERE 1=1"
+    params = []
+
+    if birth_year:
+        query += " AND birth_year = ?"
+        params.append(birth_year)
+
+    if gender:
+        query += " AND gender = ?"
+        params.append(gender)
+
+    try:
+        cursor = conn.execute(query, params)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int = None, leg: str = None) -> list:
+    """
+    Get athlete rankings with full scoring logic: merge legs, compute top3_total + ranking_key.
+    Returns one row per athlete with: athlete_name, birth_year, gender, region, city, club,
+    all_events (dict), top3_total (Antalya/Edirne/Combined), ranking_key (tiebreaker tuple).
+
+    Note: Only includes athletes from birth years with valid scoring tables (2011-2013).
+    leg parameter is ignored; always computes all three legs' scores for complete data.
+    """
+    from collections import defaultdict
+    from federasyon.scorer import score_event, merge_scores, best_scores_sequence, compute_ranking_key
+    from federasyon.scoring_tables import TABLES
+
+    conn = get_connection()
+
+    # Fetch all fed_results (raw races) - always include all legs for complete scoring
+    query = "SELECT * FROM fed_results WHERE 1=1"
+    params = []
+
+    if birth_year:
+        query += " AND birth_year = ?"
+        params.append(birth_year)
+    if gender:
+        query += " AND gender = ?"
+        params.append(gender)
+    if region:
+        query += " AND region = ?"
+        params.append(region)
+
+    try:
+        cursor = conn.execute(query, params)
+        rows = cursor.fetchall()
+        results = [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+    # Note: We show ALL athletes (including 2009/2010/2014) but score_event() returns 0 for invalid years.
+    # This allows all athletes to appear in UI but only valid years (2011-2013) get scored.
+
+    # Group by athlete (athlete_name, birth_year, gender)
+    by_athlete = defaultdict(lambda: {
+        'antalya_races': [],
+        'edirne_races': [],
+        'region': 0,
+        'city': 'Unknown',
+        'club': 'Unknown',
+    })
+
+    for r in results:
+        key = (r['athlete_name'], r['birth_year'], r['gender'])
+        athlete_info = by_athlete[key]
+        athlete_info['region'] = r.get('region', 0)
+        athlete_info['city'] = r.get('city', 'Unknown')
+        athlete_info['club'] = r.get('club', 'Unknown')
+
+        if r['race_leg'] == 'antalya':
+            athlete_info['antalya_races'].append(r)
+        else:  # edirne
+            athlete_info['edirne_races'].append(r)
+
+    # Compute scores for each athlete
+    rankings = []
+
+    for (athlete_name, birth_year, gender), info in by_athlete.items():
+        # Score Antalya races
+        antalya_events: dict[tuple, int] = {}
+        antalya_events_time: dict[tuple, str] = {}
+        for r in info['antalya_races']:
+            if r['time_seconds'] is not None:
+                try:
+                    pts = score_event(r['time_seconds'], birth_year, gender, r['stroke'], r['distance'])
+                    key = (r['stroke'], r['distance'])
+                    if pts > antalya_events.get(key, 0):
+                        antalya_events[key] = pts
+                        antalya_events_time[key] = r.get('time_text', '-')
+                except:
+                    pass
+
+        # Score Edirne races
+        edirne_events: dict[tuple, int] = {}
+        edirne_events_time: dict[tuple, str] = {}
+        for r in info['edirne_races']:
+            if r['time_seconds'] is not None:
+                try:
+                    pts = score_event(r['time_seconds'], birth_year, gender, r['stroke'], r['distance'])
+                    key = (r['stroke'], r['distance'])
+                    if pts > edirne_events.get(key, 0):
+                        edirne_events[key] = pts
+                        edirne_events_time[key] = r.get('time_text', '-')
+                except:
+                    pass
+
+        # Compute top3_total for each leg
+        antalya_top3 = sum(best_scores_sequence(antalya_events)[:3]) if antalya_events else 0
+        edirne_top3 = sum(best_scores_sequence(edirne_events)[:3]) if edirne_events else 0
+
+        # Merge for combined (use edirne time if higher points, else antalya)
+        combined_events = merge_scores(antalya_events, edirne_events)
+        combined_events_time = {}
+        for key in combined_events:
+            if key in edirne_events and edirne_events[key] == combined_events[key]:
+                combined_events_time[key] = edirne_events_time.get(key, '-')
+            else:
+                combined_events_time[key] = antalya_events_time.get(key, '-')
+
+        combined_top3 = sum(best_scores_sequence(combined_events)[:3]) if combined_events else 0
+        combined_key = compute_ranking_key(combined_events) if combined_events else ()
+
+        # Generate deterministic athlete_id for yíldízlar selection
+        athlete_id = hashlib.md5(
+            f"{athlete_name}_{birth_year}_{gender}".encode()
+        ).hexdigest()[:8]
+
+        rankings.append({
+            'athlete_id': athlete_id,
+            'athlete_name': athlete_name,
+            'birth_year': birth_year,
+            'gender': gender,
+            'region': info['region'],
+            'city': info['city'],
+            'club': info['club'],
+            'antalya_events': antalya_events,
+            'antalya_events_time': antalya_events_time,
+            'edirne_events': edirne_events,
+            'edirne_events_time': edirne_events_time,
+            'combined_events': combined_events,
+            'combined_events_time': combined_events_time,
+            'antalya_top3': antalya_top3,
+            'edirne_top3': edirne_top3,
+            'combined_top3': combined_top3,
+            'ranking_key': combined_key,
+        })
+
+    # Sort by combined_top3 (descending) then by ranking_key (tiebreaker)
+    rankings.sort(key=lambda a: (-a['combined_top3'], a['ranking_key']))
+
+    return rankings
+
+
+def get_fed_results(race_leg: str = None) -> list:
+    """Get fed_results, optionally filtered by race_leg."""
+    conn = get_connection()
+    query = "SELECT * FROM fed_results WHERE 1=1"
+    params = []
+
+    if race_leg:
+        query += " AND race_leg = ?"
+        params.append(race_leg)
+
+    try:
+        cursor = conn.execute(query, params)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def clear_fed_tables() -> bool:
+    """Clear fed_results and fed_athlete_best tables (for re-import)."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM fed_results")
+        conn.execute("DELETE FROM fed_athlete_best")
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error clearing fed tables: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def batch_insert_fed_results(results_list: list) -> int:
+    """Batch insert multiple fed_results records (FAST)."""
+    if not results_list:
+        return 0
+
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN TRANSACTION")
+        count = 0
+        for result_dict in results_list:
+            conn.execute("""
+                INSERT OR REPLACE INTO fed_results (
+                    race_leg, race_date, athlete_name, birth_year, gender,
+                    region, city, club, stroke, distance,
+                    time_text, time_seconds, points, source_pdf_seq
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                result_dict.get('race_leg', 'antalya'),
+                result_dict.get('race_date'),
+                result_dict.get('athlete_name'),
+                result_dict.get('birth_year'),
+                result_dict.get('gender'),
+                result_dict.get('region', 0),
+                result_dict.get('city'),
+                result_dict.get('club'),
+                result_dict.get('stroke'),
+                result_dict.get('distance'),
+                result_dict.get('time_text'),
+                result_dict.get('time_seconds'),
+                result_dict.get('points'),
+                result_dict.get('source_pdf_seq'),
+            ))
+            count += 1
+
+        conn.commit()
+        return count
+    except Exception as e:
+        conn.rollback()
+        print(f"Error batch inserting fed_results: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def batch_insert_fed_athlete_best(best_list: list) -> int:
+    """Batch insert multiple fed_athlete_best records (FAST)."""
+    if not best_list:
+        return 0
+
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN TRANSACTION")
+        count = 0
+        for best_dict in best_list:
+            conn.execute("""
+                INSERT OR REPLACE INTO fed_athlete_best (
+                    athlete_name, birth_year, gender, region, city, club,
+                    stroke, distance, best_points, best_time_sec, best_time_txt, best_leg
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                best_dict.get('athlete_name'),
+                best_dict.get('birth_year'),
+                best_dict.get('gender'),
+                best_dict.get('region', 0),
+                best_dict.get('city'),
+                best_dict.get('club'),
+                best_dict.get('stroke'),
+                best_dict.get('distance'),
+                best_dict.get('best_points'),
+                best_dict.get('best_time_sec'),
+                best_dict.get('best_time_txt'),
+                best_dict.get('best_leg'),
+            ))
+            count += 1
+
+        conn.commit()
+        return count
+    except Exception as e:
+        conn.rollback()
+        print(f"Error batch inserting fed_athlete_best: {e}")
+        return 0
     finally:
         conn.close()

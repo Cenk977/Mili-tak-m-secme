@@ -1,0 +1,581 @@
+diff --git a/panel/index.html b/panel/index.html
+new file mode 100644
+index 0000000..148aa2f
+--- /dev/null
++++ b/panel/index.html
+@@ -0,0 +1,575 @@
++<!DOCTYPE html>
++<html lang="tr">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>Milli Takım Seçme — Atletler</title>
++    <style>
++        * {
++            margin: 0;
++            padding: 0;
++            box-sizing: border-box;
++        }
++
++        body {
++            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
++            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
++            min-height: 100vh;
++            padding: 20px;
++        }
++
++        .container {
++            max-width: 1200px;
++            margin: 0 auto;
++            background: white;
++            border-radius: 12px;
++            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
++            overflow: hidden;
++        }
++
++        .header {
++            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
++            color: white;
++            padding: 30px 20px;
++            text-align: center;
++        }
++
++        .header h1 {
++            font-size: 28px;
++            margin-bottom: 5px;
++        }
++
++        .header p {
++            font-size: 14px;
++            opacity: 0.9;
++        }
++
++        .content {
++            padding: 30px;
++        }
++
++        .section {
++            margin-bottom: 30px;
++        }
++
++        .section-title {
++            font-size: 18px;
++            font-weight: 600;
++            color: #333;
++            margin-bottom: 15px;
++            padding-bottom: 10px;
++            border-bottom: 2px solid #667eea;
++        }
++
++        .upload-area {
++            border: 2px dashed #667eea;
++            border-radius: 8px;
++            padding: 40px;
++            text-align: center;
++            background: #f8f9ff;
++            cursor: pointer;
++            transition: all 0.3s ease;
++        }
++
++        .upload-area:hover {
++            background: #f0f2ff;
++            border-color: #764ba2;
++        }
++
++        .upload-area.active {
++            background: #e8ebff;
++            border-color: #764ba2;
++        }
++
++        .upload-area input[type="file"] {
++            display: none;
++        }
++
++        .upload-area p {
++            color: #667eea;
++            font-weight: 500;
++            margin-bottom: 10px;
++        }
++
++        .upload-area small {
++            color: #999;
++            display: block;
++        }
++
++        .filters {
++            display: flex;
++            gap: 15px;
++            flex-wrap: wrap;
++            margin-bottom: 20px;
++        }
++
++        .filter-group {
++            display: flex;
++            gap: 8px;
++            align-items: center;
++        }
++
++        .filter-group label {
++            font-weight: 500;
++            color: #333;
++            font-size: 14px;
++        }
++
++        .filter-group select,
++        .filter-group input {
++            padding: 8px 12px;
++            border: 1px solid #ddd;
++            border-radius: 6px;
++            font-size: 14px;
++            background: white;
++            cursor: pointer;
++        }
++
++        .filter-group select:focus,
++        .filter-group input:focus {
++            outline: none;
++            border-color: #667eea;
++            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
++        }
++
++        .btn {
++            padding: 10px 20px;
++            border: none;
++            border-radius: 6px;
++            font-weight: 500;
++            cursor: pointer;
++            transition: all 0.3s ease;
++            font-size: 14px;
++        }
++
++        .btn-primary {
++            background: #667eea;
++            color: white;
++        }
++
++        .btn-primary:hover {
++            background: #764ba2;
++            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
++        }
++
++        .btn-danger {
++            background: #ef5350;
++            color: white;
++        }
++
++        .btn-danger:hover {
++            background: #e53935;
++        }
++
++        .status {
++            padding: 12px 15px;
++            border-radius: 6px;
++            margin-bottom: 20px;
++            display: none;
++        }
++
++        .status.show {
++            display: block;
++        }
++
++        .status.success {
++            background: #c8e6c9;
++            color: #2e7d32;
++            border: 1px solid #81c784;
++        }
++
++        .status.error {
++            background: #ffcdd2;
++            color: #c62828;
++            border: 1px solid #ef5350;
++        }
++
++        .status.loading {
++            background: #bbdefb;
++            color: #1565c0;
++            border: 1px solid #64b5f6;
++        }
++
++        .table-wrapper {
++            overflow-x: auto;
++            border-radius: 8px;
++            border: 1px solid #ddd;
++        }
++
++        table {
++            width: 100%;
++            border-collapse: collapse;
++            font-size: 14px;
++        }
++
++        thead {
++            background: #f5f5f5;
++            border-bottom: 2px solid #ddd;
++        }
++
++        th {
++            padding: 12px 15px;
++            text-align: left;
++            font-weight: 600;
++            color: #333;
++        }
++
++        td {
++            padding: 12px 15px;
++            border-bottom: 1px solid #eee;
++        }
++
++        tbody tr:hover {
++            background: #f9f9f9;
++        }
++
++        .badge {
++            display: inline-block;
++            padding: 4px 12px;
++            border-radius: 20px;
++            font-size: 12px;
++            font-weight: 500;
++            white-space: nowrap;
++        }
++
++        .region-1 {
++            background: #e3f2fd;
++            color: #1976d2;
++        }
++
++        .region-2 {
++            background: #f3e5f5;
++            color: #7b1fa2;
++        }
++
++        .region-3 {
++            background: #e0f2f1;
++            color: #00796b;
++        }
++
++        .region-4 {
++            background: #fff3e0;
++            color: #e65100;
++        }
++
++        .region-5 {
++            background: #fce4ec;
++            color: #c2185b;
++        }
++
++        .region-6 {
++            background: #f1f8e9;
++            color: #558b2f;
++        }
++
++        .selection-TR {
++            background: #fff59d;
++            color: #f57f17;
++        }
++
++        .selection-B1 {
++            background: #e1bee7;
++            color: #6a1b9a;
++        }
++
++        .selection-Bölge {
++            background: #b2dfdb;
++            color: #00695c;
++        }
++
++        .empty {
++            text-align: center;
++            padding: 40px;
++            color: #999;
++        }
++
++        .stats {
++            display: grid;
++            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
++            gap: 15px;
++            margin-bottom: 20px;
++        }
++
++        .stat-card {
++            background: #f5f5f5;
++            padding: 20px;
++            border-radius: 8px;
++            text-align: center;
++        }
++
++        .stat-card .number {
++            font-size: 24px;
++            font-weight: 700;
++            color: #667eea;
++            margin-bottom: 5px;
++        }
++
++        .stat-card .label {
++            font-size: 12px;
++            color: #666;
++            text-transform: uppercase;
++            letter-spacing: 0.5px;
++        }
++
++        .loading {
++            text-align: center;
++            padding: 20px;
++            color: #667eea;
++        }
++
++        .spinner {
++            border: 3px solid #f3f3f3;
++            border-top: 3px solid #667eea;
++            border-radius: 50%;
++            width: 30px;
++            height: 30px;
++            animation: spin 1s linear infinite;
++            margin: 0 auto 10px;
++        }
++
++        @keyframes spin {
++            0% { transform: rotate(0deg); }
++            100% { transform: rotate(360deg); }
++        }
++    </style>
++</head>
++<body>
++    <div class="container">
++        <div class="header">
++            <h1>Milli Takım Seçme 2026</h1>
++            <p>Ulusal Takım Sporcuları Değerlendirme Sistemi</p>
++        </div>
++
++        <div class="content">
++            <!-- Upload Section -->
++            <div class="section">
++                <div class="section-title">LXF Dosyası Yükle</div>
++                <div class="upload-area" id="uploadArea">
++                    <p>Yarışma Sonuç Dosyasını Buraya Sürükleyip Bırakın</p>
++                    <small>veya tıklayarak dosya seçin (.lxf)</small>
++                    <input type="file" id="fileInput" accept=".lxf" />
++                </div>
++                <div id="uploadStatus" class="status"></div>
++            </div>
++
++            <!-- Filters & Actions -->
++            <div class="section">
++                <div class="section-title">Filtreler</div>
++                <div class="filters">
++                    <div class="filter-group">
++                        <label for="birthYear">Doğum Yılı:</label>
++                        <input type="number" id="birthYear" placeholder="Tümü" min="1990" max="2020">
++                    </div>
++                    <div class="filter-group">
++                        <label for="gender">Cinsiyet:</label>
++                        <select id="gender">
++                            <option value="">Tümü</option>
++                            <option value="M">Erkek</option>
++                            <option value="F">Kız</option>
++                        </select>
++                    </div>
++                    <button class="btn btn-primary" onclick="loadRankings()">Filtrele</button>
++                    <button class="btn btn-danger" onclick="clearDatabase()">Veritabanını Temizle</button>
++                </div>
++            </div>
++
++            <!-- Statistics -->
++            <div class="section" id="statsSection" style="display: none;">
++                <div class="stats" id="stats"></div>
++            </div>
++
++            <!-- Results Table -->
++            <div class="section">
++                <div class="section-title">Sonuçlar</div>
++                <div id="resultsContainer">
++                    <div class="empty">Yarışma sonuç dosyası yükleme işlemini başlayın</div>
++                </div>
++            </div>
++        </div>
++    </div>
++
++    <script>
++        // Upload handling
++        const uploadArea = document.getElementById('uploadArea');
++        const fileInput = document.getElementById('fileInput');
++        const uploadStatus = document.getElementById('uploadStatus');
++
++        uploadArea.addEventListener('click', () => fileInput.click());
++
++        uploadArea.addEventListener('dragover', (e) => {
++            e.preventDefault();
++            uploadArea.classList.add('active');
++        });
++
++        uploadArea.addEventListener('dragleave', () => {
++            uploadArea.classList.remove('active');
++        });
++
++        uploadArea.addEventListener('drop', (e) => {
++            e.preventDefault();
++            uploadArea.classList.remove('active');
++            const files = e.dataTransfer.files;
++            if (files.length > 0) {
++                fileInput.files = files;
++                uploadFile();
++            }
++        });
++
++        fileInput.addEventListener('change', uploadFile);
++
++        function uploadFile() {
++            const file = fileInput.files[0];
++            if (!file) return;
++
++            const formData = new FormData();
++            formData.append('file', file);
++
++            uploadStatus.classList.add('show', 'loading');
++            uploadStatus.textContent = 'Dosya yükleniyor...';
++
++            fetch('/upload', {
++                method: 'POST',
++                body: formData
++            })
++            .then(response => response.json())
++            .then(data => {
++                if (data.status === 'success') {
++                    uploadStatus.classList.remove('loading');
++                    uploadStatus.classList.add('success');
++                    uploadStatus.textContent = `✓ Başarılı! ${data.count} sporcu yüklendi`;
++                    fileInput.value = '';
++                    setTimeout(() => loadRankings(), 1000);
++                } else {
++                    uploadStatus.classList.remove('loading');
++                    uploadStatus.classList.add('error');
++                    uploadStatus.textContent = `✗ Hata: ${data.message}`;
++                }
++            })
++            .catch(error => {
++                uploadStatus.classList.remove('loading');
++                uploadStatus.classList.add('error');
++                uploadStatus.textContent = `✗ Hata: ${error.message}`;
++            });
++        }
++
++        // Load rankings
++        async function loadRankings() {
++            const birthYear = document.getElementById('birthYear').value || null;
++            const gender = document.getElementById('gender').value || null;
++
++            const params = new URLSearchParams();
++            if (birthYear) params.append('birth_year', birthYear);
++            if (gender) params.append('gender', gender);
++
++            const url = `/api/ranking${params.toString() ? '?' + params.toString() : ''}`;
++
++            const resultsContainer = document.getElementById('resultsContainer');
++            resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Veriler yükleniyor...</div>';
++
++            try {
++                const response = await fetch(url);
++                const athletes = await response.json();
++
++                if (!Array.isArray(athletes) || athletes.length === 0) {
++                    resultsContainer.innerHTML = '<div class="empty">Sonuç bulunamadı</div>';
++                    return;
++                }
++
++                // Calculate stats
++                const stats = {
++                    total: athletes.length,
++                    selected: athletes.filter(a => a.selected).length,
++                    regions: {}
++                };
++
++                athletes.forEach(a => {
++                    const region = a.region || 0;
++                    stats.regions[region] = (stats.regions[region] || 0) + 1;
++                });
++
++                // Display stats
++                const statsSection = document.getElementById('statsSection');
++                const statsDiv = document.getElementById('stats');
++                statsDiv.innerHTML = `
++                    <div class="stat-card">
++                        <div class="number">${stats.total}</div>
++                        <div class="label">Toplam Sporcu</div>
++                    </div>
++                    <div class="stat-card">
++                        <div class="number">${stats.selected}</div>
++                        <div class="label">Seçilmiş</div>
++                    </div>
++                `;
++                statsSection.style.display = 'block';
++
++                // Create table
++                let html = '<div class="table-wrapper"><table><thead><tr>' +
++                    '<th>Ad Soyad</th>' +
++                    '<th>Kulüp</th>' +
++                    '<th>Şehir</th>' +
++                    '<th>Bölge</th>' +
++                    '<th>Yaş</th>' +
++                    '<th>Cinsiyet</th>' +
++                    '<th>Skor</th>' +
++                    '<th>Seçim</th>' +
++                    '</tr></thead><tbody>';
++
++                athletes.forEach(athlete => {
++                    const name = `${athlete.firstname || ''} ${athlete.lastname || ''}`.trim() || 'Bilinmiyor';
++                    const club = athlete.club_name || 'Bilinmiyor';
++                    const city = athlete.city || 'Bilinmiyor';
++                    const region = athlete.region || 0;
++                    const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
++                    const gender = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kız' : '-';
++                    const score = (athlete.best_score || 0).toFixed(2);
++                    const selectionBadge = athlete.selection_type ?
++                        `<span class="badge selection-${athlete.selection_type}">${athlete.selection_type}</span>` :
++                        '<span style="color: #999;">-</span>';
++                    const regionBadge = region ?
++                        `<span class="badge region-${region}">Bölge ${region}</span>` :
++                        '<span style="color: #999;">Bilinmiyor</span>';
++
++                    html += `<tr>
++                        <td>${name}</td>
++                        <td>${club}</td>
++                        <td>${city}</td>
++                        <td>${regionBadge}</td>
++                        <td>${age}</td>
++                        <td>${gender}</td>
++                        <td>${score}</td>
++                        <td>${selectionBadge}</td>
++                    </tr>`;
++                });
++
++                html += '</tbody></table></div>';
++                resultsContainer.innerHTML = html;
++            } catch (error) {
++                resultsContainer.innerHTML = `<div class="empty">Hata: ${error.message}</div>`;
++            }
++        }
++
++        // Clear database
++        function clearDatabase() {
++            if (!confirm('Veritabanındaki tüm veriler silinecek. Emin misiniz?')) {
++                return;
++            }
++
++            fetch('/clear', { method: 'POST' })
++                .then(response => response.json())
++                .then(() => {
++                    uploadStatus.classList.add('show', 'success');
++                    uploadStatus.textContent = '✓ Veritabanı temizlendi';
++                    document.getElementById('resultsContainer').innerHTML = '<div class="empty">Yarışma sonuç dosyası yükleme işlemini başlayın</div>';
++                    document.getElementById('statsSection').style.display = 'none';
++                })
++                .catch(error => {
++                    uploadStatus.classList.add('show', 'error');
++                    uploadStatus.textContent = `✗ Hata: ${error.message}`;
++                });
++        }
++
++        // Load initial rankings
++        loadRankings();
++    </script>
++</body>
++</html>

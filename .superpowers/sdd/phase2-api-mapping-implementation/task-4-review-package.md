@@ -1,0 +1,96 @@
+diff --git a/modules/lxf_parser.py b/modules/lxf_parser.py
+index fcca1d4..a27c2d8 100644
+--- a/modules/lxf_parser.py
++++ b/modules/lxf_parser.py
+@@ -1,18 +1,19 @@
+ """
+ LXF (Lenex) format parser for swimming competition data
+ """
+ 
+ import zipfile
+ import xml.etree.ElementTree as ET
+ from typing import List, Dict, Optional
+ from datetime import datetime
++from modules.m4_mapping import lookup_club
+ 
+ 
+ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
+     """
+     Parse LXF file and extract athletes and results.
+ 
+     Returns:
+         Tuple of (athletes, results) lists
+     """
+     athletes_list = []
+@@ -41,41 +42,70 @@ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
+                     if swim_style is not None:
+                         distance = swim_style.get('distance')
+                         stroke = swim_style.get('stroke')
+ 
+                     events_lookup[event_id] = {
+                         'distance': distance,
+                         'stroke': stroke,
+                         'gender': event.get('gender'),
+                     }
+ 
++                # Build club lookup table (athleteid -> club info)
++                # Handles LXF formats where athletes are nested inside CLUB elements
++                club_by_athlete = {}
++                clubs = root.findall('.//CLUB')
++                for club_elem in clubs:
++                    club_id = club_elem.get('clubid')
++                    club_name = club_elem.get('clubname') or club_elem.get('name')
++                    athletes_in_club = club_elem.findall('.//ATHLETE')
++                    for athlete_in_club in athletes_in_club:
++                        athlete_id = athlete_in_club.get('athleteid')
++                        if athlete_id and club_name:
++                            club_by_athlete[athlete_id] = {
++                                'club_id': club_id,
++                                'club_name': club_name,
++                            }
++
+                 # Parse athletes
+                 athlete_elements = root.findall('.//ATHLETE')
+ 
+                 for athlete_elem in athlete_elements:
+                     athlete_id = athlete_elem.get('athleteid')
+                     athlete = {
+                         'athlete_id': athlete_id,
+                         'firstname': athlete_elem.get('firstname'),
+                         'lastname': athlete_elem.get('lastname'),
+                         'birthdate': athlete_elem.get('birthdate'),
+                         'gender': athlete_elem.get('gender'),
+                         'license': athlete_elem.get('license'),
+                         'club_id': None,
+                         'club_name': None,
++                        'city': 'Unknown',
++                        'region': 0,
+                     }
+ 
+-                    # Get club info if available
++                    # Get club info if available (direct child CLUB element)
+                     club_elem = athlete_elem.find('.//CLUB')
+                     if club_elem is not None:
+                         athlete['club_id'] = club_elem.get('clubid')
+                         athlete['club_name'] = club_elem.get('clubname')
++                    # Or from parent CLUB element (some LXF formats)
++                    elif athlete_id in club_by_athlete:
++                        athlete['club_id'] = club_by_athlete[athlete_id]['club_id']
++                        athlete['club_name'] = club_by_athlete[athlete_id]['club_name']
++
++                    # Look up city/region from Excel mapping
++                    if athlete['club_name']:
++                        mapping = lookup_club(athlete['club_name'])
++                        if mapping:
++                            athlete['city'] = mapping['city']
++                            athlete['region'] = mapping['region']
+ 
+                     athletes_list.append(athlete)
+ 
+                     # Parse results for this athlete
+                     results_elem = athlete_elem.find('.//RESULTS')
+                     if results_elem is not None:
+                         for result_elem in results_elem.findall('.//RESULT'):
+                             event_id = result_elem.get('eventid')
+                             event_info = events_lookup.get(event_id, {})
+ 

@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from typing import List, Dict, Optional
 from datetime import datetime
 from modules.m4_mapping import lookup_club
+from config import STROKE_MAP
 
 
 def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
@@ -109,11 +110,15 @@ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
                             event_id = result_elem.get('eventid')
                             event_info = events_lookup.get(event_id, {})
 
+                            # Map stroke from English to Turkish
+                            stroke_code = event_info.get('stroke')
+                            stroke_turkish = STROKE_MAP.get(stroke_code, stroke_code)
+
                             result = {
                                 'athlete_id': athlete_id,
                                 'event_id': event_id,
                                 'distance': event_info.get('distance'),
-                                'stroke': event_info.get('stroke'),
+                                'stroke': stroke_turkish,
                                 'time_text': result_elem.get('swimtime'),
                                 'time_seconds': parse_swimtime(result_elem.get('swimtime')),
                                 'place': result_elem.get('place'),

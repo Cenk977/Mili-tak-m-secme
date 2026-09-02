@@ -3,7 +3,7 @@ Configuration for Milli Takım Seçme Sistemi
 """
 
 # Competition year
-COMPETITION_YEAR = 2026
+COMPETITION_YEAR = 2027
 
 # Database configuration
 DB_PATH = "data/selection.db"
@@ -44,8 +44,25 @@ STROKE_MAP = {
     "MEDLEY": "Karışık"
 }
 
-# Age groups for selection
-TARGET_BIRTH_YEARS = {2013, 2012, 2011}
+# Age groups for selection (only groups with REAL scoring thresholds in federasyon/scoring_tables.py)
+# 2013 (13-yaş), 2012 (14-yaş), 2011 (15-yaş) - these have OFFICIAL scoring tables
+# Note: 2009, 2010, 2014 have placeholder data only - exclude from selection
+TARGET_AGE_GROUPS = {2011, 2012, 2013}
+TARGET_BIRTH_YEARS = TARGET_AGE_GROUPS  # backward compatibility
+VALID_SCORING_YEARS = {2011, 2012, 2013}  # Only years with real (non-placeholder) scoring tables
+
+# Birth year parsing
+YB_CENTURY_CUTOFF = 26  # For 2-digit years: 00-26 = 2000-2026, 27+ = 1927-1999
+
+# Selection quotas for national team (per age group) - only for groups with scoring tables
+SELECTION_QUOTAS = {
+    2013: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7},
+    2012: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7},
+    2011: {"tr": 8, "region_1": 3, "region_other": 2, "min_points": 7},
+}
+
+# Scoring points system (baraj)
+POINTS = [1, 2, 3, 4, 5, 6, 7, 9]  # 8 is skipped, matches reference system
 
 # Gender mapping
 GENDER_MAP = {

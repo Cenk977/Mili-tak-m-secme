@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Milli Takım Seçme — Atletler</title>
+    <link rel="stylesheet" href="styles.css">
     <style>
         * {
             margin: 0;
@@ -219,7 +220,12 @@
             border-bottom: 1px solid #eee;
         }
 
-        tbody tr:hover {
+        tbody tr.athlete-row:hover {
+            background: #f0f2ff;
+            cursor: pointer;
+        }
+
+        tbody tr.athlete-detail-row {
             background: #f9f9f9;
         }
 
@@ -265,16 +271,17 @@
         .selection-TR {
             background: #fff59d;
             color: #f57f17;
+            font-weight: 600;
         }
 
-        .selection-B1 {
-            background: #e1bee7;
-            color: #6a1b9a;
-        }
-
-        .selection-Bölge {
+        .selection-BÖLGE {
             background: #b2dfdb;
             color: #00695c;
+            font-weight: 600;
+        }
+
+        .selection-null {
+            color: #999;
         }
 
         .empty {
@@ -331,6 +338,160 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 12px 12px 0 0;
+            width: 100%;
+            max-width: 600px;
+            max-height: 60vh;
+            overflow-y: auto;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .athlete-detail {
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .athlete-detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .athlete-detail-row strong {
+            color: #333;
+            font-size: 13px;
+        }
+
+        .athlete-detail-row span {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .events-table {
+            width: 100%;
+            margin-top: 10px;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .events-table thead {
+            background: #f9f9f9;
+        }
+
+        .events-table th {
+            padding: 6px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .events-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 12px;
+        }
+
+        .events-table tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .cursor-pointer {
+            cursor: pointer;
+            text-decoration: underline;
+            color: #667eea;
+        }
+
+        .cursor-pointer:hover {
+            color: #764ba2;
+        }
+
+        .action-btn {
+            padding: 10px 16px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+
+        .action-btn:hover {
+            background: #229954;
+        }
+
+        .action-btn:active {
+            opacity: 0.8;
+        }
+
+        .yildizlar-section {
+            margin-top: 20px;
+            padding: 15px;
+            border-top: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+
+        .yildiz-item {
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .yildiz-item strong {
+            display: block;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -350,26 +511,53 @@
                     <input type="file" id="fileInput" accept=".lxf" />
                 </div>
                 <div id="uploadStatus" class="status"></div>
+                <button class="btn btn-danger" id="clearBtn" style="margin-top: 15px;">Veritabanını Temizle</button>
             </div>
 
-            <!-- Filters & Actions -->
+            <!-- Leg Filter Buttons -->
+            <div class="section">
+                <div class="section-title">Yarışma Etabı</div>
+                <div class="leg-buttons">
+                    <button class="leg-btn active" data-leg="combined">Birleşik</button>
+                    <button class="leg-btn" data-leg="antalya">Antalya</button>
+                    <button class="leg-btn" data-leg="edirne">Edirne</button>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
             <div class="section">
                 <div class="section-title">Filtreler</div>
-                <div class="filters">
-                    <div class="filter-group">
-                        <label for="birthYear">Doğum Yılı:</label>
-                        <input type="number" id="birthYear" placeholder="Tümü" min="1990" max="2020">
-                    </div>
-                    <div class="filter-group">
-                        <label for="gender">Cinsiyet:</label>
-                        <select id="gender">
-                            <option value="">Tümü</option>
-                            <option value="M">Erkek</option>
-                            <option value="F">Kız</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary" onclick="loadRankings()">Filtrele</button>
-                    <button class="btn btn-danger" onclick="clearDatabase()">Veritabanını Temizle</button>
+                <div class="filter-bar">
+                    <input
+                        type="search"
+                        id="athlete-search"
+                        class="athlete-search"
+                        placeholder="Sporcu adı ara..."
+                        autocomplete="off"
+                    >
+                    <select id="birth-year-filter" class="birth-year-filter">
+                        <option value="">Doğum Yılı</option>
+                        <option value="2011">2011</option>
+                        <option value="2012">2012</option>
+                        <option value="2013">2013</option>
+                        <option value="2009">2009</option>
+                        <option value="2010">2010</option>
+                        <option value="2014">2014</option>
+                    </select>
+                    <select id="gender-filter" class="gender-filter">
+                        <option value="">Cinsiyet</option>
+                        <option value="F">Kadın</option>
+                        <option value="M">Erkek</option>
+                    </select>
+                    <select id="leg-filter" class="leg-filter">
+                        <option value="">Leg</option>
+                        <option value="antalya">Antalya</option>
+                        <option value="edirne">Edirne</option>
+                        <option value="combined">Combined</option>
+                    </select>
+                    <button id="exportBtn" class="action-btn">
+                      📥 Excel'e İndir
+                    </button>
                 </div>
             </div>
 
@@ -378,17 +566,72 @@
                 <div class="stats" id="stats"></div>
             </div>
 
-            <!-- Results Table -->
+            <!-- Athletes List -->
             <div class="section">
                 <div class="section-title">Sonuçlar</div>
-                <div id="resultsContainer">
-                    <div class="empty">Yarışma sonuç dosyası yükleme işlemini başlayın</div>
+                <div id="athletes-list" class="athletes-list">
+                    <div class="list-header">
+                        <div class="col-badge">Sıra</div>
+                        <div class="col-name">Sporcu</div>
+                        <div class="col-info">Şehir (Kulüp)</div>
+                        <div class="col-stats">Puan | Seçim | Yaş/Cinsiyet</div>
+                        <div class="col-action"></div>
+                    </div>
+                    <!-- Athlete rows will be populated by JavaScript in Task 3 -->
+                    <div id="athletes-container"></div>
+                </div>
+
+                <div id="loading" style="display:none; text-align: center; padding: 20px;">
+                    <p>Sporcular yükleniyor...</p>
+                </div>
+
+                <div id="no-results" class="no-results" style="display:none;">
+                    Arama kriterlerine uygun sporcu bulunamadı.
+                </div>
+            </div>
+
+            <!-- Regional Rankings Section -->
+            <div id="regionalSection" style="margin-top: 40px; display: none;">
+                <div class="section-title">Bölge Sıralamaları</div>
+
+                <div class="region-tabs">
+                    <button class="region-tab active" data-region="1">İstanbul</button>
+                    <button class="region-tab" data-region="2">Marmara</button>
+                    <button class="region-tab" data-region="3">Ege</button>
+                    <button class="region-tab" data-region="4">İç Anadolu</button>
+                    <button class="region-tab" data-region="5">Karadeniz</button>
+                    <button class="region-tab" data-region="6">Güneydoğu</button>
+                </div>
+
+                <div id="regionalRankings" class="athletes-list">
+                    <div class="list-header">
+                        <div class="col-badge">Sıra</div>
+                        <div class="col-name">Sporcu</div>
+                        <div class="col-info">Şehir (Kulüp)</div>
+                        <div class="col-stats">Puan | Seçim | Yaş/Cinsiyet</div>
+                        <div class="col-action"></div>
+                    </div>
+                    <div id="regional-athletes-container"></div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Athlete Detail Modal -->
+    <div class="modal" id="athleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Sporcu Detayları</h2>
+                <button class="modal-close" onclick="closeAthleteModal()">&times;</button>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
     <script>
+        // Leg selection state
+        let currentLeg = 'combined';
+
         // Upload handling
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
@@ -452,101 +695,579 @@
             });
         }
 
-        // Load rankings
-        async function loadRankings() {
-            const birthYear = document.getElementById('birthYear').value || null;
-            const gender = document.getElementById('gender').value || null;
+        // ========== Task 3: Athlete Row Rendering Functions ==========
 
-            const params = new URLSearchParams();
-            if (birthYear) params.append('birth_year', birthYear);
-            if (gender) params.append('gender', gender);
+        // Store athletes data globally for detail row access
+        window.athletesData = [];
 
-            const url = `/api/ranking${params.toString() ? '?' + params.toString() : ''}`;
+        // Populate yíldízlar fields in detail content
+        function populateYildizarFields(athlete, contentDiv) {
+            document.getElementById('yildiz-multi-status').textContent =
+                athlete.selected_yildiz_multinations ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-multi-coach').textContent =
+                athlete.coach_called_yildiz_multinations ? 'Antrenör barajı geçti' : '-';
 
-            const resultsContainer = document.getElementById('resultsContainer');
-            resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Veriler yükleniyor...</div>';
+            document.getElementById('yildiz-comen-aralik').textContent =
+                athlete.selected_yildiz_comen_cup_aralik ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-comen-aralik-coach').textContent =
+                athlete.coach_called_yildiz_comen_cup_aralik ? 'Antrenör barajı geçti' : '-';
 
-            try {
-                const response = await fetch(url);
-                const athletes = await response.json();
+            document.getElementById('yildiz-comen-nisan').textContent =
+                athlete.selected_yildiz_comen_cup_nisan ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-comen-nisan-coach').textContent =
+                athlete.coach_called_yildiz_comen_cup_nisan ? 'Antrenör barajı geçti' : '-';
 
-                if (!Array.isArray(athletes) || athletes.length === 0) {
-                    resultsContainer.innerHTML = '<div class="empty">Sonuç bulunamadı</div>';
-                    return;
+            document.getElementById('yildiz-central-aralik').textContent =
+                athlete.selected_yildiz_central_europe_aralik ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-central-aralik-coach').textContent =
+                athlete.coach_called_yildiz_central_europe_aralik ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('yildiz-central-nisan').textContent =
+                athlete.selected_yildiz_central_europe_nisan ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-central-nisan-coach').textContent =
+                athlete.coach_called_yildiz_central_europe_nisan ? 'Antrenör barajı geçti' : '-';
+        }
+
+        // Map ranking number to medal emoji or ordinal
+        function getRankingBadge(ranking) {
+            if (ranking === 1) return '🥇';
+            if (ranking === 2) return '🥈';
+            if (ranking === 3) return '🥉';
+            return ranking + '.';
+        }
+
+        // Get selection badge status text
+        function getSelectionBadgeStatus(status) {
+            return status || 'BARAJ_YOK';
+        }
+
+        // Filter athletes by search query (case-insensitive, Turkish characters)
+        function filterAthletesBySearch(athletes, query) {
+            if (!query) return athletes;
+            const lowerQuery = query.toLowerCase().trim();
+            return athletes.filter(a =>
+                a.athlete_name.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        // Toggle detail row visibility
+        function toggleDetailRow(athleteName) {
+            const detailRow = document.querySelector(`.detail-row[data-athlete-name="${athleteName}"]`);
+            if (!detailRow) return;
+
+            const athleteRow = document.querySelector(`.athlete-row[data-athlete-name="${athleteName}"]`);
+            if (!athleteRow) return;
+
+            const expandBtn = athleteRow.querySelector('.expand-btn');
+            const isVisible = detailRow.classList.contains('visible');
+
+            if (!isVisible) {
+                // Mark as visible and populate detail content if not already done
+                detailRow.classList.add('visible');
+                if (expandBtn) {
+                    expandBtn.classList.add('open');
                 }
 
-                // Calculate stats
-                const stats = {
-                    total: athletes.length,
-                    selected: athletes.filter(a => a.selected).length,
-                    regions: {}
-                };
+                // Populate detail content if still shows loading
+                const contentDiv = detailRow.querySelector('.detail-content');
+                if (contentDiv && contentDiv.textContent.includes('Yükleniyor')) {
+                    const athlete = window.athletesData.find(a =>
+                        a.athlete_name === athleteName
+                    );
+                    if (athlete) {
+                        populateDetailContent(contentDiv, athlete);
+                    }
+                }
+            } else {
+                // Hide
+                detailRow.classList.remove('visible');
+                if (expandBtn) {
+                    expandBtn.classList.remove('open');
+                }
+            }
+        }
 
-                athletes.forEach(a => {
-                    const region = a.region || 0;
-                    stats.regions[region] = (stats.regions[region] || 0) + 1;
-                });
+        // Populate detail row content with athlete information
+        function populateDetailContent(contentDiv, athlete) {
+            const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
+            const genderText = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kadın' : '-';
+            const regionNames = ['Bilinmiyor', 'İstanbul', 'Marmara', 'Ege', 'İç Anadolu', 'Karadeniz', 'Güneydoğu'];
+            const regionName = regionNames[athlete.region || 0] || 'Bilinmiyor';
 
-                // Display stats
-                const statsSection = document.getElementById('statsSection');
-                const statsDiv = document.getElementById('stats');
-                statsDiv.innerHTML = `
-                    <div class="stat-card">
-                        <div class="number">${stats.total}</div>
-                        <div class="label">Toplam Sporcu</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="number">${stats.selected}</div>
-                        <div class="label">Seçilmiş</div>
-                    </div>
-                `;
-                statsSection.style.display = 'block';
+            let html = '<div style="padding: 15px; background: #f9f9f9; border-radius: 6px;">';
 
-                // Create table
-                let html = '<div class="table-wrapper"><table><thead><tr>' +
-                    '<th>Ad Soyad</th>' +
-                    '<th>Kulüp</th>' +
-                    '<th>Şehir</th>' +
-                    '<th>Bölge</th>' +
-                    '<th>Yaş</th>' +
-                    '<th>Cinsiyet</th>' +
-                    '<th>Skor</th>' +
-                    '<th>Seçim</th>' +
-                    '</tr></thead><tbody>';
+            // Top info row
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+            html += '<div><strong style="font-size: 12px; color: #666;">Yaş:</strong><div>' + age + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Cinsiyet:</strong><div>' + genderText + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Bölge:</strong><div>' + regionName + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Şehir:</strong><div>' + (athlete.city || '-') + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Kulüp:</strong><div>' + (athlete.club || '-') + '</div></div>';
+            html += '</div>';
 
-                athletes.forEach(athlete => {
-                    const name = `${athlete.firstname || ''} ${athlete.lastname || ''}`.trim() || 'Bilinmiyor';
-                    const club = athlete.club_name || 'Bilinmiyor';
-                    const city = athlete.city || 'Bilinmiyor';
-                    const region = athlete.region || 0;
-                    const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
-                    const gender = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kız' : '-';
-                    const score = (athlete.best_score || 0).toFixed(2);
-                    const selectionBadge = athlete.selection_type ?
-                        `<span class="badge selection-${athlete.selection_type}">${athlete.selection_type}</span>` :
-                        '<span style="color: #999;">-</span>';
-                    const regionBadge = region ?
-                        `<span class="badge region-${region}">Bölge ${region}</span>` :
-                        '<span style="color: #999;">Bilinmiyor</span>';
+            // Selection status
+            const selectionColor = {
+                'TR': '#fff59d',
+                'BÖLGE': '#c5e1a5',
+                'BARAJ_YOK': '#ffccbc',
+                '-': '#e0e0e0'
+            };
+            const selStatus = athlete.selected || '-';
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px; padding: 10px; background: white; border-radius: 4px; border-left: 3px solid #667eea;">';
+            html += '<div><strong style="font-size: 12px; color: #666;">Seçim:</strong><div style="background: ' + (selectionColor[selStatus] || '#f5f5f5') + '; padding: 4px 8px; border-radius: 3px; font-weight: 600;">' + selStatus + '</div></div>';
+            if (athlete.selected_slot && athlete.selected_slot !== '-') {
+                html += '<div><strong style="font-size: 12px; color: #666;">Seçim Sırası:</strong><div>' + athlete.selected_slot + '</div></div>';
+            }
+            if (athlete.multinations) {
+                html += '<div><strong style="font-size: 12px; color: #666;">Statü:</strong><div style="background: #fce4ec; padding: 4px 8px; border-radius: 3px; color: #c2185b; font-weight: 600;">⭐ Multinations</div></div>';
+            }
+            html += '</div>';
 
-                    html += `<tr>
-                        <td>${name}</td>
-                        <td>${club}</td>
-                        <td>${city}</td>
-                        <td>${regionBadge}</td>
-                        <td>${age}</td>
-                        <td>${gender}</td>
-                        <td>${score}</td>
-                        <td>${selectionBadge}</td>
+            // Yıldızlar Milli Takımları section
+            html += '<div class="yildizlar-section">';
+            html += '<h3 style="margin: 0 0 15px 0; font-size: 14px; color: #333;">Yıldızlar Milli Takımları</h3>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Multinations Yıldızlar:</strong>';
+            html += '<span id="yildiz-multi-status">-</span> | ';
+            html += '<span id="yildiz-multi-coach">-</span>';
+            html += '</div>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Comen Cup:</strong>';
+            html += '<div>';
+            html += '<span>Aralık: <span id="yildiz-comen-aralik">-</span> | ';
+            html += '<span id="yildiz-comen-aralik-coach">-</span></span>';
+            html += '</div>';
+            html += '<div>';
+            html += '<span>Nisan: <span id="yildiz-comen-nisan">-</span> | ';
+            html += '<span id="yildiz-comen-nisan-coach">-</span></span>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Central European Countries Meet:</strong>';
+            html += '<div>';
+            html += '<span>Aralık: <span id="yildiz-central-aralik">-</span> | ';
+            html += '<span id="yildiz-central-aralik-coach">-</span></span>';
+            html += '</div>';
+            html += '<div>';
+            html += '<span>Nisan: <span id="yildiz-central-nisan">-</span> | ';
+            html += '<span id="yildiz-central-nisan-coach">-</span></span>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '</div>';
+
+            // Parse combined_events and show all with their points
+            const combined_events = athlete.combined_events || {};
+            if (Object.keys(combined_events).length > 0) {
+                const sortedRaces = Object.entries(combined_events)
+                    .map(([key, data]) => {
+                        const [stroke, distance] = JSON.parse(key);
+                        const points = data.points !== undefined ? data.points : (typeof data === 'number' ? data : 0);
+                        const time = data.time !== undefined ? data.time : '-';
+                        return { stroke, distance, points, time };
+                    })
+                    .sort((a, b) => b.points - a.points);
+
+                // Calculate tiebreaker info (top3, top4, top5, top6)
+                const points_list = sortedRaces.map(r => r.points);
+                const top3 = points_list.slice(0, 3).reduce((a, b) => a + b, 0);
+                const top4 = points_list.slice(0, 4).reduce((a, b) => a + b, 0);
+                const top5 = points_list.slice(0, 5).reduce((a, b) => a + b, 0);
+                const top6 = points_list.slice(0, 6).reduce((a, b) => a + b, 0);
+
+                // Tiebreaker info
+                if (top3 > 0) {
+                    html += '<div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 4px; border-left: 3px solid #764ba2;">';
+                    html += '<strong style="font-size: 12px; color: #666; display: block; margin-bottom: 6px;">Sıralama Detayı (Federasyon Karması):</strong>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 13px;">';
+                    html += '<div><span style="color: #666;">Top 3:</span> <strong style="color: #667eea;">' + top3 + '</strong></div>';
+                    if (top4 > top3) html += '<div><span style="color: #666;">Top 4:</span> <strong>' + top4 + '</strong></div>';
+                    if (top5 > top4) html += '<div><span style="color: #666;">Top 5:</span> <strong>' + top5 + '</strong></div>';
+                    if (top6 > top5) html += '<div><span style="color: #666;">Top 6:</span> <strong>' + top6 + '</strong></div>';
+                    html += '</div></div>';
+                }
+
+                html += '<div style="margin-bottom: 10px;">';
+                html += '<strong style="display: block; margin-bottom: 10px; font-size: 14px;">Tüm Yarışmalar (En Yüksek Puanından)</strong>';
+                html += '<table class="events-table" style="width: 100%; border-collapse: collapse;">';
+                html += '<thead><tr style="background: #e8ebf7; border-bottom: 1px solid #ccc;"><th style="text-align: left; padding: 8px;">Stil</th><th style="text-align: left; padding: 8px;">Mesafe</th><th style="text-align: center; padding: 8px;">Derece</th><th style="text-align: right; padding: 8px;">Puan</th><th style="text-align: center; padding: 8px;">Seçim Sırası</th></tr></thead>';
+                html += '<tbody>';
+
+                sortedRaces.forEach((race, idx) => {
+                    const isTop3 = idx < 3 ? 'background: #fff9c4;' : '';
+                    const selectedSlot = athlete.selected_slot || '-';
+                    html += `<tr style="border-bottom: 1px solid #eee; ${isTop3}">
+                        <td style="padding: 8px;">${race.stroke}</td>
+                        <td style="padding: 8px;">${race.distance}m</td>
+                        <td style="text-align: center; padding: 8px; font-family: monospace; color: #666;">${race.time}</td>
+                        <td style="text-align: right; padding: 8px;"><strong style="color: #667eea; font-size: 14px;">${race.points}</strong></td>
+                        <td style="text-align: center; padding: 8px;"><strong style="color: #764ba2;">${selectedSlot}</strong></td>
                     </tr>`;
                 });
 
                 html += '</tbody></table></div>';
-                resultsContainer.innerHTML = html;
+            } else {
+                html += '<div style="color: #999; font-size: 12px; padding: 10px; background: white; border-radius: 4px;">Yarışma kaydı yok</div>';
+            }
+
+            html += '</div>';
+            contentDiv.innerHTML = html;
+            // Populate yíldízlar fields after HTML is rendered
+            populateYildizarFields(athlete, contentDiv);
+        }
+
+        // Main rendering function
+        function renderAthletes(athletes, searchQuery = '') {
+            const container = document.getElementById('athletes-container');
+            const noResultsDiv = document.getElementById('no-results');
+
+            if (!athletes || athletes.length === 0) {
+                container.innerHTML = '';
+                noResultsDiv.style.display = 'block';
+                return;
+            }
+
+            // Filter by search query
+            const filtered = filterAthletesBySearch(athletes, searchQuery);
+
+            if (filtered.length === 0) {
+                container.innerHTML = '';
+                noResultsDiv.style.display = 'block';
+                return;
+            }
+
+            noResultsDiv.style.display = 'none';
+
+            // Sort athletes: multinations first, then by display_top3 (descending)
+            const sorted = filtered.sort((a, b) => {
+                // Multinations athletes at the top
+                if (a.selected === "MULTINATIONS" && b.selected !== "MULTINATIONS") return -1;
+                if (a.selected !== "MULTINATIONS" && b.selected === "MULTINATIONS") return 1;
+
+                // Then sort by points (descending)
+                const scoreA = a.display_top3 || 0;
+                const scoreB = b.display_top3 || 0;
+                return scoreB - scoreA;
+            });
+
+            // Render each athlete row
+            container.innerHTML = sorted.map((athlete, idx) => {
+                const ranking = idx + 1;
+                const badge = getRankingBadge(ranking);
+                const badgeStatus = athlete.multinations ? 'MULTINATIONS' : (athlete.selected || 'BARAJ_YOK');
+                const points = athlete.display_top3 || 0;
+                const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
+                const genderText = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kadın' : '-';
+
+                return `
+                    <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}">
+                        <div class="col-badge">${badge}</div>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <div class="col-name">${athlete.athlete_name}</div>
+                            <div class="col-info">${athlete.city} (${athlete.club})</div>
+                            <div class="col-stats" style="margin-top: 3px;">
+                                <span class="points"><strong>${points > 0 ? points : '-'}</strong></span>
+                                <span class="selection-badge" data-status="${badgeStatus}">
+                                    ${athlete.selected_slot || '-'}
+                                </span>
+                                <span class="age-gender">${age} ${genderText}</span>
+                            </div>
+                        </div>
+                        <div class="col-action">
+                            <button class="expand-btn" aria-label="Detayları aç">↓</button>
+                        </div>
+                    </div>
+                    <div class="detail-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}">
+                        <div class="detail-content">
+                            <div class="races-placeholder">Yükleniyor...</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Attach event listeners to expand buttons
+            container.querySelectorAll('.expand-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const row = this.closest('.athlete-row');
+                    const athleteName = row.dataset.athleteName;
+                    toggleDetailRow(athleteName);
+                });
+            });
+
+            // Display stats
+            const statsSection = document.getElementById('statsSection');
+            const statsDiv = document.getElementById('stats');
+            const selected = athletes.filter(a => a.selected && a.selected !== '-').length;
+            statsDiv.innerHTML = `
+                <div class="stat-card">
+                    <div class="number">${athletes.length}</div>
+                    <div class="label">Toplam Sporcu</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">${selected}</div>
+                    <div class="label">Seçilmiş</div>
+                </div>
+            `;
+            statsSection.style.display = 'block';
+        }
+
+        // Show regional section when data available
+        function showRegionalSection() {
+            document.getElementById('regionalSection').style.display = 'block';
+        }
+
+        // Load and render regional rankings
+        async function loadRegionalRankings(region, leg) {
+            try {
+                const response = await fetch(`/api/regional?region=${region}&leg=${leg}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const athletes = await response.json();
+
+                // Render in regional section
+                const container = document.getElementById('regional-athletes-container');
+                container.innerHTML = '';
+
+                if (!athletes || athletes.length === 0) {
+                    container.innerHTML = '<div class="no-results">Bu bölgede sporcu bulunamadı.</div>';
+                    return;
+                }
+
+                // Sort athletes by display_top3 (descending) for ranking
+                const sorted = athletes.sort((a, b) => {
+                    const scoreA = a.display_top3 || 0;
+                    const scoreB = b.display_top3 || 0;
+                    return scoreB - scoreA;
+                });
+
+                // Render each athlete row
+                container.innerHTML = sorted.map((athlete, idx) => {
+                    const ranking = idx + 1;
+                    const badge = getRankingBadge(ranking);
+                    const badgeStatus = athlete.multinations ? 'MULTINATIONS' : (athlete.selected || 'BARAJ_YOK');
+                    const multinationsIndicator = athlete.multinations
+                        ? '<span style="margin-left: 5px; font-size: 16px;">⭐</span>'
+                        : '';
+                    const points = athlete.display_top3 || 0;
+                    const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
+                    const genderText = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kadın' : '-';
+
+                    return `
+                        <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}">
+                            <div class="col-badge">${badge}</div>
+                            <div class="col-name">
+                                ${athlete.athlete_name}${multinationsIndicator}
+                            </div>
+                            <div class="col-info">
+                                ${athlete.city} (${athlete.club})
+                            </div>
+                            <div class="col-stats">
+                                <span class="points"><strong>${points > 0 ? points : '-'}</strong></span>
+                                <span class="selection-badge" data-status="${badgeStatus}">
+                                    ${athlete.selected_slot || '-'}
+                                </span>
+                                <span class="age-gender">${age} ${genderText}</span>
+                            </div>
+                            <div class="col-action">
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
             } catch (error) {
-                resultsContainer.innerHTML = `<div class="empty">Hata: ${error.message}</div>`;
+                console.error('Error loading regional rankings:', error);
+                const container = document.getElementById('regional-athletes-container');
+                container.innerHTML = `<div class="no-results">Hata: ${error.message}</div>`;
             }
         }
+
+        // Load rankings from API and render
+        async function loadRankings() {
+            try {
+                // Get filter values
+                const birthYear = document.getElementById('birth-year-filter').value;
+                const gender = document.getElementById('gender-filter').value;
+                const searchQuery = document.getElementById('athlete-search').value;
+                const activeLegBtn = document.querySelector('.leg-btn.active');
+                const leg = activeLegBtn?.dataset.leg || 'combined';
+
+                // Build query string
+                const params = new URLSearchParams();
+                params.append('leg', leg);
+                if (birthYear) params.append('birth_year', birthYear);
+                if (gender) params.append('gender', gender);
+
+                const url = `/api/ranking?${params.toString()}`;
+
+                // Show loading state
+                const container = document.getElementById('athletes-container');
+                const athletesList = document.getElementById('athletes-list');
+                const loading = document.getElementById('loading');
+                container.innerHTML = '';
+                loading.style.display = 'block';
+                athletesList.style.display = 'block';
+
+                // Fetch rankings
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const athletes = await response.json();
+
+                // Store in global for detail row access
+                window.athletesData = athletes;
+
+                // Hide loading
+                loading.style.display = 'none';
+
+                // Render athletes
+                renderAthletes(athletes, searchQuery);
+
+            } catch (error) {
+                console.error('Error loading rankings:', error);
+                document.getElementById('athletes-container').innerHTML = '';
+                document.getElementById('no-results').style.display = 'block';
+                document.getElementById('no-results').textContent = `Hata: ${error.message}`;
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Add event listeners for filters (real-time search)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Search input - real-time filtering
+            const searchInput = document.getElementById('athlete-search');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const query = this.value;
+                    renderAthletes(window.athletesData, query);
+                });
+            }
+
+            // Birth year filter
+            const birthYearFilter = document.getElementById('birth-year-filter');
+            if (birthYearFilter) {
+                birthYearFilter.addEventListener('change', loadRankings);
+            }
+
+            // Gender filter
+            const genderFilter = document.getElementById('gender-filter');
+            if (genderFilter) {
+                genderFilter.addEventListener('change', loadRankings);
+            }
+
+            // Leg button handlers
+            document.querySelectorAll('.leg-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Remove active from all, add to clicked
+                    document.querySelectorAll('.leg-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Reload rankings with new leg
+                    loadRankings();
+
+                    // Also reload regional rankings if visible
+                    const regionalSection = document.getElementById('regionalSection');
+                    if (regionalSection && regionalSection.style.display !== 'none') {
+                        const activeRegionTab = document.querySelector('.region-tab.active');
+                        if (activeRegionTab) {
+                            const region = activeRegionTab.dataset.region;
+                            const leg = this.dataset.leg;
+                            loadRegionalRankings(region, leg);
+                        }
+                    }
+                });
+            });
+
+            // Leg filter dropdown (legacy support)
+            const legFilter = document.getElementById('leg-filter');
+            if (legFilter) {
+                legFilter.addEventListener('change', function() {
+                    const selectedLeg = this.value || 'combined';
+                    // Update active button to match dropdown
+                    document.querySelectorAll('.leg-btn').forEach(b => b.classList.remove('active'));
+                    const activeBtn = document.querySelector(`.leg-btn[data-leg="${selectedLeg}"]`);
+                    if (activeBtn) {
+                        activeBtn.classList.add('active');
+                    }
+                    loadRankings();
+                });
+            }
+
+            // Export button handler
+            document.getElementById('exportBtn').addEventListener('click', async function() {
+                try {
+                    const birthYear = document.getElementById('birth-year-filter')?.value || '';
+                    const gender = document.getElementById('gender-filter')?.value || '';
+                    const leg = document.querySelector('.leg-btn.active')?.dataset.leg || 'combined';
+
+                    // Build export URL
+                    let url = `/api/export?leg=${leg}`;
+                    if (birthYear) url += `&birth_year=${birthYear}`;
+                    if (gender) url += `&gender=${gender}`;
+
+                    // Trigger download
+                    window.location.href = url;
+
+                } catch (error) {
+                    console.error('Export error:', error);
+                    alert('İhraç başarısız');
+                }
+            });
+
+            // Clear database button handler
+            const clearBtn = document.getElementById('clearBtn');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function() {
+                    if (confirm('Tüm veritabanı silinecek. Emin misiniz?')) {
+                        clearDatabase();
+                    }
+                });
+            }
+
+            // Regional ranking tab handlers
+            document.querySelectorAll('.region-tab').forEach(tab => {
+                tab.addEventListener('click', async function() {
+                    // Update active tab
+                    document.querySelectorAll('.region-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Fetch regional rankings
+                    const region = this.dataset.region;
+                    const leg = document.querySelector('.leg-btn.active')?.dataset.leg || 'combined';
+
+                    await loadRegionalRankings(region, leg);
+                });
+            });
+
+            // Load initial regional rankings when data is available
+            uploadArea.addEventListener('change', function() {
+                setTimeout(() => {
+                    const container = document.getElementById('athletes-container');
+                    if (container && container.innerHTML !== '') {
+                        showRegionalSection();
+                        loadRegionalRankings('1', 'combined');
+                    }
+                }, 1500);
+            });
+
+            // Also trigger on file upload completion
+            fileInput.addEventListener('change', function() {
+                setTimeout(() => {
+                    const container = document.getElementById('athletes-container');
+                    if (container && container.innerHTML !== '') {
+                        showRegionalSection();
+                        loadRegionalRankings('1', 'combined');
+                    }
+                }, 1500);
+            });
+        });
 
         // Clear database
         function clearDatabase() {
@@ -559,7 +1280,9 @@
                 .then(() => {
                     uploadStatus.classList.add('show', 'success');
                     uploadStatus.textContent = '✓ Veritabanı temizlendi';
-                    document.getElementById('resultsContainer').innerHTML = '<div class="empty">Yarışma sonuç dosyası yükleme işlemini başlayın</div>';
+                    // Task 3: Clear athletes container and hide results
+                    document.getElementById('athletes-container').innerHTML = '';
+                    document.getElementById('athletes-list').style.display = 'none';
                     document.getElementById('statsSection').style.display = 'none';
                 })
                 .catch(error => {
@@ -568,8 +1291,111 @@
                 });
         }
 
-        // Load initial rankings
-        loadRankings();
+        // Load initial rankings (commented - wait for user filter)
+        // loadRankings();
+
+        // Toggle athlete detail row (inline expand)
+        function toggleAthleteDetail(athleteKey, athlete) {
+            const detailRow = document.getElementById(`detail-${athleteKey}`);
+            const contentCell = document.getElementById(`detail-content-${athleteKey}`);
+
+            const isVisible = detailRow.style.display !== 'none';
+
+            if (isVisible) {
+                detailRow.style.display = 'none';
+                return;
+            }
+
+            const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
+            const gender = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kız' : '-';
+            const regionName = ['Bilinmiyor', 'İstanbul', 'Marmara', 'Ege', 'İç Anadolu', 'Karadeniz', 'Güneydoğu'][athlete.region || 0];
+
+            let html = '<div style="padding: 15px; background: #f9f9f9; border-radius: 6px;">';
+
+            // Top info row
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+            html += '<div><strong style="font-size: 12px; color: #666;">Yaş:</strong><div>' + age + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Cinsiyet:</strong><div>' + gender + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Bölge:</strong><div>' + regionName + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Şehir:</strong><div>' + (athlete.city || '-') + '</div></div>';
+            html += '<div><strong style="font-size: 12px; color: #666;">Kulüp:</strong><div>' + (athlete.club || '-') + '</div></div>';
+            html += '</div>';
+
+            // Selection status
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px; padding: 10px; background: white; border-radius: 4px; border-left: 3px solid #667eea;">';
+            const selectionColor = {
+                'TR': '#fff59d',
+                'BÖLGE': '#c5e1a5',
+                'BARAJ_YOK': '#ffccbc',
+                '-': '#e0e0e0'
+            };
+            const selStatus = athlete.selected || '-';
+            html += '<div><strong style="font-size: 12px; color: #666;">Seçim:</strong><div style="background: ' + (selectionColor[selStatus] || '#f5f5f5') + '; padding: 4px 8px; border-radius: 3px; font-weight: 600;">' + selStatus + '</div></div>';
+            if (athlete.selected_slot && athlete.selected_slot !== '-') {
+                html += '<div><strong style="font-size: 12px; color: #666;">Seçim Sırası:</strong><div>' + athlete.selected_slot + '</div></div>';
+            }
+            if (athlete.multinations) {
+                html += '<div><strong style="font-size: 12px; color: #666;">Statü:</strong><div style="background: #fce4ec; padding: 4px 8px; border-radius: 3px; color: #c2185b; font-weight: 600;">⭐ Multinations</div></div>';
+            }
+            html += '</div>';
+
+            // Parse combined_events and show all with their points
+            if (athlete.combined_events && Object.keys(athlete.combined_events).length > 0) {
+                const sortedRaces = Object.entries(athlete.combined_events)
+                    .map(([key, points]) => {
+                        const [stroke, distance] = JSON.parse(key);
+                        return { stroke, distance, points };
+                    })
+                    .sort((a, b) => b.points - a.points);
+
+                // Calculate tiebreaker info (top3, top4, top5, top6)
+                const points = sortedRaces.map(r => r.points);
+                const top3 = points.slice(0, 3).reduce((a, b) => a + b, 0);
+                const top4 = points.slice(0, 4).reduce((a, b) => a + b, 0);
+                const top5 = points.slice(0, 5).reduce((a, b) => a + b, 0);
+                const top6 = points.slice(0, 6).reduce((a, b) => a + b, 0);
+
+                // Tiebreaker info
+                if (top3 > 0) {
+                    html += '<div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 4px; border-left: 3px solid #764ba2;">';
+                    html += '<strong style="font-size: 12px; color: #666; display: block; margin-bottom: 6px;">Sıralama Detayı (Federasyon Karması):</strong>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 13px;">';
+                    html += '<div><span style="color: #666;">Top 3:</span> <strong style="color: #667eea;">' + top3 + '</strong></div>';
+                    if (top4 > top3) html += '<div><span style="color: #666;">Top 4:</span> <strong>' + top4 + '</strong></div>';
+                    if (top5 > top4) html += '<div><span style="color: #666;">Top 5:</span> <strong>' + top5 + '</strong></div>';
+                    if (top6 > top5) html += '<div><span style="color: #666;">Top 6:</span> <strong>' + top6 + '</strong></div>';
+                    html += '</div></div>';
+                }
+
+                html += '<div style="margin-bottom: 10px;">';
+                html += '<strong style="display: block; margin-bottom: 10px; font-size: 14px;">Tüm Yarışmalar (En Yüksek Puanından)</strong>';
+                html += '<table class="events-table" style="width: 100%; border-collapse: collapse;">';
+                html += '<thead><tr style="background: #e8ebf7; border-bottom: 1px solid #ccc;"><th style="text-align: left; padding: 8px;">Stil</th><th style="text-align: left; padding: 8px;">Mesafe</th><th style="text-align: center; padding: 8px;">Derece</th><th style="text-align: right; padding: 8px;">Puan</th><th style="text-align: center; padding: 8px;">Seçim Sırası</th></tr></thead>';
+                html += '<tbody>';
+
+                sortedRaces.forEach((race, idx) => {
+                    const isTop3 = idx < 3 ? 'background: #fff9c4;' : '';
+                    const raceData = athlete.combined_events[JSON.stringify([race.stroke, race.distance])] || {};
+                    const timeText = raceData.time || '-';
+                    const selectedSlot = athlete.selected_slot || '-';
+                    html += `<tr style="border-bottom: 1px solid #eee; ${isTop3}">
+                        <td style="padding: 8px;">${race.stroke}</td>
+                        <td style="padding: 8px;">${race.distance}m</td>
+                        <td style="text-align: center; padding: 8px; font-family: monospace; color: #666;">${timeText}</td>
+                        <td style="text-align: right; padding: 8px;"><strong style="color: #667eea; font-size: 14px;">${race.points}</strong></td>
+                        <td style="text-align: center; padding: 8px;"><strong style="color: #764ba2;">${selectedSlot}</strong></td>
+                    </tr>`;
+                });
+
+                html += '</tbody></table></div>';
+            } else {
+                html += '<div style="color: #999; font-size: 12px; padding: 10px; background: white; border-radius: 4px;">Yarışma kaydı yok</div>';
+            }
+
+            html += '</div>';
+            contentCell.innerHTML = html;
+            detailRow.style.display = '';
+        }
     </script>
 </body>
 </html>

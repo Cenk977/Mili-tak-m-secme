@@ -1,0 +1,235 @@
+{
+  "communities": {
+    "0": [
+      "basehttprequesthandler",
+      "panel_serve_dashboardhandler",
+      "panel_serve_dashboardhandler_do_get",
+      "panel_serve_dashboardhandler_do_post",
+      "panel_serve_dashboardhandler_handle_clear",
+      "panel_serve_dashboardhandler_handle_upload",
+      "panel_serve_dashboardhandler_log_message",
+      "panel_serve_dashboardhandler_serve_api_ranking",
+      "panel_serve_dashboardhandler_serve_index",
+      "panel_serve_rationale_113",
+      "panel_serve_rationale_147",
+      "panel_serve_rationale_73",
+      "panel_serve_rationale_76",
+      "panel_serve_rationale_89",
+      "panel_serve_rationale_98"
+    ],
+    "1": [
+      "modules_lxf_parser",
+      "modules_lxf_parser_get_birth_year",
+      "modules_lxf_parser_map_stroke_name",
+      "modules_lxf_parser_parse_lxf_file",
+      "modules_lxf_parser_parse_swimtime",
+      "modules_lxf_parser_rationale_1",
+      "modules_lxf_parser_rationale_13",
+      "modules_lxf_parser_rationale_132",
+      "modules_lxf_parser_rationale_154",
+      "modules_lxf_parser_rationale_170",
+      "panel_serve_process_lxf_upload",
+      "panel_serve_rationale_32",
+      "test_lxf_data",
+      "test_lxf_data_main"
+    ],
+    "2": [
+      "config",
+      "config_rationale_1",
+      "modules_m4_mapping",
+      "modules_m4_mapping_clubinfo",
+      "modules_m4_mapping_get_missing_clubs",
+      "modules_m4_mapping_load_mapping",
+      "modules_m4_mapping_lookup_club",
+      "modules_m4_mapping_rationale_1",
+      "modules_m4_mapping_rationale_100",
+      "modules_m4_mapping_rationale_117",
+      "modules_m4_mapping_rationale_35",
+      "typeddict"
+    ],
+    "3": [
+      "database_db",
+      "database_db_get_all_athletes",
+      "database_db_insert_result",
+      "database_db_rationale_1",
+      "database_db_rationale_172",
+      "database_db_rationale_183",
+      "database_db_update_athlete_ranking",
+      "database_init"
+    ],
+    "4": [
+      "connection",
+      "database_db_clear_athletes",
+      "database_db_get_connection",
+      "database_db_rationale_11",
+      "database_db_rationale_201"
+    ],
+    "5": [
+      "database_db_init_db",
+      "database_db_rationale_19",
+      "panel_serve",
+      "panel_serve_main"
+    ],
+    "6": [
+      "database_db_get_athletes_by_filter",
+      "database_db_rationale_145"
+    ],
+    "7": [
+      "database_db_get_missing_clubs_from_db",
+      "database_db_rationale_218"
+    ],
+    "8": [
+      "database_db_insert_athlete",
+      "database_db_rationale_81"
+    ],
+    "9": [
+      "federation_init"
+    ],
+    "10": [
+      "modules_init"
+    ],
+    "11": [
+      "panel_init"
+    ]
+  },
+  "cohesion": {
+    "0": 0.17142857142857143,
+    "1": 0.23076923076923078,
+    "2": 0.21212121212121213,
+    "3": 0.35714285714285715,
+    "4": 0.4,
+    "5": 0.6666666666666666,
+    "6": 1.0,
+    "7": 1.0,
+    "8": 1.0,
+    "9": 1.0,
+    "10": 1.0,
+    "11": 1.0
+  },
+  "gods": [
+    {
+      "id": "database_db_get_connection",
+      "label": "get_connection()",
+      "degree": 12
+    },
+    {
+      "id": "panel_serve_dashboardhandler",
+      "label": "DashboardHandler",
+      "degree": 10
+    },
+    {
+      "id": "modules_lxf_parser_parse_lxf_file",
+      "label": "parse_lxf_file()",
+      "degree": 8
+    },
+    {
+      "id": "panel_serve_process_lxf_upload",
+      "label": "process_lxf_upload()",
+      "degree": 8
+    },
+    {
+      "id": "modules_m4_mapping_lookup_club",
+      "label": "lookup_club()",
+      "degree": 7
+    },
+    {
+      "id": "modules_lxf_parser_get_birth_year",
+      "label": "get_birth_year()",
+      "degree": 6
+    },
+    {
+      "id": "database_db_clear_athletes",
+      "label": "clear_athletes()",
+      "degree": 6
+    },
+    {
+      "id": "database_db_init_db",
+      "label": "init_db()",
+      "degree": 6
+    },
+    {
+      "id": "database_db_get_athletes_by_filter",
+      "label": "get_athletes_by_filter()",
+      "degree": 6
+    },
+    {
+      "id": "database_db_get_missing_clubs_from_db",
+      "label": "get_missing_clubs_from_db()",
+      "degree": 6
+    }
+  ],
+  "surprises": [
+    {
+      "source": "process_lxf_upload()",
+      "target": "get_missing_clubs_from_db()",
+      "source_files": [
+        "panel/serve.py",
+        "database/db.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "process_lxf_upload()",
+      "target": "insert_athlete()",
+      "source_files": [
+        "panel/serve.py",
+        "database/db.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "process_lxf_upload()",
+      "target": "insert_result()",
+      "source_files": [
+        "panel/serve.py",
+        "database/db.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "main()",
+      "target": "init_db()",
+      "source_files": [
+        "panel/serve.py",
+        "database/db.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; peripheral node `main()` unexpectedly reaches hub `init_db()`"
+    },
+    {
+      "source": "process_lxf_upload()",
+      "target": "get_birth_year()",
+      "source_files": [
+        "panel/serve.py",
+        "modules/lxf_parser.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `DashboardHandler` connect `DashboardHandler` to `serve.py`?",
+      "why": "High betweenness centrality (0.244) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `parse_lxf_file()` connect `lxf_parser.py` to `m4_mapping.py`, `serve.py`?",
+      "why": "High betweenness centrality (0.128) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `lookup_club()` connect `m4_mapping.py` to `lxf_parser.py`?",
+      "why": "High betweenness centrality (0.100) - this node is a cross-community bridge."
+    }
+  ]
+}

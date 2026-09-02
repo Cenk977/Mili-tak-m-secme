@@ -8,6 +8,14 @@ from database.db import (
     update_athlete_ranking,
     clear_athletes,
     get_missing_clubs_from_db,
+    insert_fed_result,
+    insert_fed_athlete_best,
+    get_fed_athlete_best,
+    get_athlete_rankings,
+    get_fed_results,
+    clear_fed_tables,
+    batch_insert_fed_results,
+    batch_insert_fed_athlete_best,
 )
 
 __all__ = [
@@ -20,4 +28,11 @@ __all__ = [
     'update_athlete_ranking',
     'clear_athletes',
     'get_missing_clubs_from_db',
+    'insert_fed_result',
+    'insert_fed_athlete_best',
+    'get_fed_athlete_best',
+    'get_fed_results',
+    'clear_fed_tables',
+    'batch_insert_fed_results',
+    'batch_insert_fed_athlete_best',
 ]

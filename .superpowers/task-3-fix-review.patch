@@ -1,0 +1,120 @@
+diff --git a/docs/superpowers/sdd-reports/task-3-report.md b/docs/superpowers/sdd-reports/task-3-report.md
+index 5d697b5..8b414f4 100644
+--- a/docs/superpowers/sdd-reports/task-3-report.md
++++ b/docs/superpowers/sdd-reports/task-3-report.md
+@@ -357,3 +357,115 @@ Task 3 successfully implements the athlete row rendering system with:
+ - ✓ Proper error handling
+ 
+ The system is ready for Task 4 (detail content enhancement) and production use with larger datasets.
++
++---
++
++## Code Review Fixes (Post-Implementation)
++
++**Date:** 2026-09-02  
++**Reviewer:** Coordinator  
++**Status:** FIXED ✓ (Commit d36964b)
++
++### Issue 1: CRITICAL - Character Encoding Bug (Line 697)
++
++**Problem:**
++```javascript
++// BEFORE (Cyrillic characters)
++if (contentDiv && contentDiv.textContent.includes('Yüклениyor')) {
++```
++
++The placeholder text at line 871 is Turkish `'Yükleniyor...'`, but the comparison was checking for Cyrillic `'Yüклениyor'`. This mismatch caused the detail content to never load on first expand.
++
++**Fix Applied:**
++```javascript
++// AFTER (Turkish characters)
++if (contentDiv && contentDiv.textContent.includes('Yükleniyor')) {
++```
++
++**Impact:** Detail rows now populate correctly when expanded for the first time.
++
++---
++
++### Issue 2: CRITICAL - Badge Colors Wrong (Lines 860-861)
++
++**Problem:**
++The inline style attribute was overriding CSS class selectors with wrong colors:
++- TR: `#fff59d` (yellow) ❌ → Should be: `#4a9eff` (blue)
++- BÖLGE: `#c5e1a5` (green) ❌ → Should be: `#ff9800` (orange)
++
++The inline styles completely bypassed the CSS variable system defined in styles.css.
++
++**Fix Applied:**
++Removed all inline style attributes and let CSS class selectors handle colors:
++
++```javascript
++// BEFORE
++<span class="selection-badge" data-status="${status}" style="background: ${status === 'TR' ? '#fff59d' : status === 'BÖLGE' ? '#c5e1a5' : '#f0f0f0'}; ...">
++
++// AFTER
++<span class="selection-badge" data-status="${badgeStatus}">
++    ${athlete.selected_slot || '-'}
++</span>
++```
++
++**Color Mapping (CSS):**
++- `data-status="TR"` → `--badge-tr: #4a9eff` (blue) ✓
++- `data-status="BÖLGE"` → `--badge-bolge: #ff9800` (orange) ✓
++- `data-status="MULTINATIONS"` → `--badge-multi: #9c27b0` (purple) ✓
++- `data-status="BARAJ_YOK"` → `--badge-baraj: #999` (gray) ✓
++
++**Impact:** Badges now display correct colors per specification. Dark mode also works correctly with CSS variable overrides.
++
++---
++
++### Issue 3: IMPORTANT - Multinations Badge Color Missing
++
++**Problem:**
++Multinations athletes showed the ⭐ star in the name column, but the selection badge didn't reflect multinations status. The badge would show "TR" or "BÖLGE" color instead of purple.
++
++**Fix Applied:**
++Create badgeStatus variable that checks multinations flag before selection status:
++
++```javascript
++// BEFORE
++const status = getSelectionBadgeStatus(athlete.selected);
++
++// AFTER
++const badgeStatus = athlete.multinations ? 'MULTINATIONS' : (athlete.selected || 'BARAJ_YOK');
++```
++
++Then pass badgeStatus to the badge:
++```javascript
++<span class="selection-badge" data-status="${badgeStatus}">
++```
++
++**Impact:** Multinations athletes now show purple badges regardless of TR/BÖLGE selection status. Single badge clearly indicates athlete status.
++
++---
++
++### Verification Results
++
++**✓ Issue 1 - Character Encoding**
++- Placeholder text now matches comparison string
++- Detail rows expand and populate content correctly
++- No encoding errors in console
++
++**✓ Issue 2 - Badge Colors**
++- TR badges display blue (#4a9eff)
++- BÖLGE badges display orange (#ff9800)
++- Light theme and dark theme both render correctly
++- CSS variables properly cascade
++
++**✓ Issue 3 - Multinations**
++- Multinations athletes show purple badges
++- Selection slot still displays in badge
++- Star indicator shows in name column
++- Multi-status display works correctly
++
++### Commit Information
++
++**Commit:** d36964b  
++**Message:** "fix: Task 3 character encoding bug and badge styling"  
++**Changes:** panel/index.html (3 insertions, 3 deletions)
++
++All fixes are backward compatible with no breaking changes.
