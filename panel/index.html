@@ -475,6 +475,23 @@
         .action-btn:active {
             opacity: 0.8;
         }
+
+        .yildizlar-section {
+            margin-top: 20px;
+            padding: 15px;
+            border-top: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+
+        .yildiz-item {
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .yildiz-item strong {
+            display: block;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -683,6 +700,34 @@
         // Store athletes data globally for detail row access
         window.athletesData = [];
 
+        // Populate yíldízlar fields in detail content
+        function populateYildizarFields(athlete, contentDiv) {
+            document.getElementById('yildiz-multi-status').textContent =
+                athlete.selected_yildiz_multinations ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-multi-coach').textContent =
+                athlete.coach_called_yildiz_multinations ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('yildiz-comen-aralik').textContent =
+                athlete.selected_yildiz_comen_cup_aralik ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-comen-aralik-coach').textContent =
+                athlete.coach_called_yildiz_comen_cup_aralik ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('yildiz-comen-nisan').textContent =
+                athlete.selected_yildiz_comen_cup_nisan ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-comen-nisan-coach').textContent =
+                athlete.coach_called_yildiz_comen_cup_nisan ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('yildiz-central-aralik').textContent =
+                athlete.selected_yildiz_central_europe_aralik ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-central-aralik-coach').textContent =
+                athlete.coach_called_yildiz_central_europe_aralik ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('yildiz-central-nisan').textContent =
+                athlete.selected_yildiz_central_europe_nisan ? 'Seçildi ✓' : '-';
+            document.getElementById('yildiz-central-nisan-coach').textContent =
+                athlete.coach_called_yildiz_central_europe_nisan ? 'Antrenör barajı geçti' : '-';
+        }
+
         // Map ranking number to medal emoji or ordinal
         function getRankingBadge(ranking) {
             if (ranking === 1) return '🥇';
@@ -778,6 +823,42 @@
             }
             html += '</div>';
 
+            // Yıldızlar Milli Takımları section
+            html += '<div class="yildizlar-section">';
+            html += '<h3 style="margin: 0 0 15px 0; font-size: 14px; color: #333;">Yıldızlar Milli Takımları</h3>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Multinations Yıldızlar:</strong>';
+            html += '<span id="yildiz-multi-status">-</span> | ';
+            html += '<span id="yildiz-multi-coach">-</span>';
+            html += '</div>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Comen Cup:</strong>';
+            html += '<div>';
+            html += '<span>Aralık: <span id="yildiz-comen-aralik">-</span> | ';
+            html += '<span id="yildiz-comen-aralik-coach">-</span></span>';
+            html += '</div>';
+            html += '<div>';
+            html += '<span>Nisan: <span id="yildiz-comen-nisan">-</span> | ';
+            html += '<span id="yildiz-comen-nisan-coach">-</span></span>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Central European Countries Meet:</strong>';
+            html += '<div>';
+            html += '<span>Aralık: <span id="yildiz-central-aralik">-</span> | ';
+            html += '<span id="yildiz-central-aralik-coach">-</span></span>';
+            html += '</div>';
+            html += '<div>';
+            html += '<span>Nisan: <span id="yildiz-central-nisan">-</span> | ';
+            html += '<span id="yildiz-central-nisan-coach">-</span></span>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '</div>';
+
             // Parse combined_events and show all with their points
             const combined_events = athlete.combined_events || {};
             if (Object.keys(combined_events).length > 0) {
@@ -834,6 +915,8 @@
 
             html += '</div>';
             contentDiv.innerHTML = html;
+            // Populate yíldízlar fields after HTML is rendered
+            populateYildizarFields(athlete, contentDiv);
         }
 
         // Main rendering function
