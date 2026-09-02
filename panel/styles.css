@@ -81,6 +81,40 @@ body {
   border-color: #0066cc;
 }
 
+/* ===== REGION FILTER BUTTONS ===== */
+.region-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.region-tab {
+  padding: 8px 14px;
+  border: 2px solid #ccc;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.region-tab:hover {
+  border-color: #0066cc;
+}
+
+.region-tab.active {
+  background: #0066cc;
+  color: white;
+  border-color: #0066cc;
+}
+
+#regionalRankings {
+  margin-top: 20px;
+}
+
 /* ===== FILTER BAR ===== */
 .filter-bar {
   display: flex;
@@ -403,6 +437,16 @@ body {
   .leg-btn {
     flex: 1;
     min-width: 80px;
+  }
+
+  .region-tabs {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .region-tab {
+    padding: 6px 12px;
+    font-size: 12px;
   }
 
   .filter-bar {

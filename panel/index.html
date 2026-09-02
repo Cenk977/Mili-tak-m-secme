@@ -548,6 +548,31 @@
                     Arama kriterlerine uygun sporcu bulunamadı.
                 </div>
             </div>
+
+            <!-- Regional Rankings Section -->
+            <div id="regionalSection" style="margin-top: 40px; display: none;">
+                <div class="section-title">Bölge Sıralamaları</div>
+
+                <div class="region-tabs">
+                    <button class="region-tab active" data-region="1">İstanbul</button>
+                    <button class="region-tab" data-region="2">Marmara</button>
+                    <button class="region-tab" data-region="3">Ege</button>
+                    <button class="region-tab" data-region="4">İç Anadolu</button>
+                    <button class="region-tab" data-region="5">Karadeniz</button>
+                    <button class="region-tab" data-region="6">Güneydoğu</button>
+                </div>
+
+                <div id="regionalRankings" class="athletes-list">
+                    <div class="list-header">
+                        <div class="col-badge">Sıra</div>
+                        <div class="col-name">Sporcu</div>
+                        <div class="col-info">Şehir (Kulüp)</div>
+                        <div class="col-stats">Puan | Seçim | Yaş/Cinsiyet</div>
+                        <div class="col-action"></div>
+                    </div>
+                    <div id="regional-athletes-container"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -883,6 +908,78 @@
             statsSection.style.display = 'block';
         }
 
+        // Show regional section when data available
+        function showRegionalSection() {
+            document.getElementById('regionalSection').style.display = 'block';
+        }
+
+        // Load and render regional rankings
+        async function loadRegionalRankings(region, leg) {
+            try {
+                const response = await fetch(`/api/regional?region=${region}&leg=${leg}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const athletes = await response.json();
+
+                // Render in regional section
+                const container = document.getElementById('regional-athletes-container');
+                container.innerHTML = '';
+
+                if (!athletes || athletes.length === 0) {
+                    container.innerHTML = '<div class="no-results">Bu bölgede sporcu bulunamadı.</div>';
+                    return;
+                }
+
+                // Sort athletes by display_top3 (descending) for ranking
+                const sorted = athletes.sort((a, b) => {
+                    const scoreA = a.display_top3 || 0;
+                    const scoreB = b.display_top3 || 0;
+                    return scoreB - scoreA;
+                });
+
+                // Render each athlete row
+                container.innerHTML = sorted.map((athlete, idx) => {
+                    const ranking = idx + 1;
+                    const badge = getRankingBadge(ranking);
+                    const badgeStatus = athlete.multinations ? 'MULTINATIONS' : (athlete.selected || 'BARAJ_YOK');
+                    const multinationsIndicator = athlete.multinations
+                        ? '<span style="margin-left: 5px; font-size: 16px;">⭐</span>'
+                        : '';
+                    const points = athlete.display_top3 || 0;
+                    const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
+                    const genderText = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kadın' : '-';
+
+                    return `
+                        <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}">
+                            <div class="col-badge">${badge}</div>
+                            <div class="col-name">
+                                ${athlete.athlete_name}${multinationsIndicator}
+                            </div>
+                            <div class="col-info">
+                                ${athlete.city} (${athlete.club})
+                            </div>
+                            <div class="col-stats">
+                                <span class="points"><strong>${points}</strong></span>
+                                <span class="selection-badge" data-status="${badgeStatus}">
+                                    ${athlete.selected_slot || '-'}
+                                </span>
+                                <span class="age-gender">${age} ${genderText}</span>
+                            </div>
+                            <div class="col-action">
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error loading regional rankings:', error);
+                const container = document.getElementById('regional-athletes-container');
+                container.innerHTML = `<div class="no-results">Hata: ${error.message}</div>`;
+            }
+        }
+
         // Load rankings from API and render
         async function loadRankings() {
             try {
@@ -967,6 +1064,17 @@
 
                     // Reload rankings with new leg
                     loadRankings();
+
+                    // Also reload regional rankings if visible
+                    const regionalSection = document.getElementById('regionalSection');
+                    if (regionalSection && regionalSection.style.display !== 'none') {
+                        const activeRegionTab = document.querySelector('.region-tab.active');
+                        if (activeRegionTab) {
+                            const region = activeRegionTab.dataset.region;
+                            const leg = this.dataset.leg;
+                            loadRegionalRankings(region, leg);
+                        }
+                    }
                 });
             });
 
@@ -984,6 +1092,43 @@
                     loadRankings();
                 });
             }
+
+            // Regional ranking tab handlers
+            document.querySelectorAll('.region-tab').forEach(tab => {
+                tab.addEventListener('click', async function() {
+                    // Update active tab
+                    document.querySelectorAll('.region-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Fetch regional rankings
+                    const region = this.dataset.region;
+                    const leg = document.querySelector('.leg-btn.active')?.dataset.leg || 'combined';
+
+                    await loadRegionalRankings(region, leg);
+                });
+            });
+
+            // Load initial regional rankings when data is available
+            uploadArea.addEventListener('change', function() {
+                setTimeout(() => {
+                    const container = document.getElementById('athletes-container');
+                    if (container && container.innerHTML !== '') {
+                        showRegionalSection();
+                        loadRegionalRankings('1', 'combined');
+                    }
+                }, 1500);
+            });
+
+            // Also trigger on file upload completion
+            fileInput.addEventListener('change', function() {
+                setTimeout(() => {
+                    const container = document.getElementById('athletes-container');
+                    if (container && container.innerHTML !== '') {
+                        showRegionalSection();
+                        loadRegionalRankings('1', 'combined');
+                    }
+                }, 1500);
+            });
         });
 
         // Clear database

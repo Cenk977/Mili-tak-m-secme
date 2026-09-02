@@ -421,6 +421,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.serve_index()
         elif self.path.startswith('/api/ranking'):
             self.serve_api_ranking()
+        elif self.path.startswith('/api/regional'):
+            self.serve_api_regional()
         else:
             self.serve_static_file()
 
@@ -614,6 +616,84 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Error in /api/ranking: {e}", exc_info=True)
+            self.send_error(500, str(e))
+
+    def serve_api_regional(self):
+        """Serve regional rankings API endpoint."""
+        try:
+            # Parse query params
+            qs = urlparse(self.path).query
+            params = parse_qs(qs)
+
+            region = None
+            leg = params.get('leg', ['combined'])[0]
+
+            if 'region' in params:
+                try:
+                    region = int(params['region'][0])
+                except ValueError:
+                    pass
+
+            # Get all athletes filtered by region
+            athletes = get_athlete_rankings(None, None, region)
+
+            # Filter by leg
+            if leg == 'antalya':
+                athletes = [a for a in athletes if len(a['antalya_events']) > 0]
+            elif leg == 'edirne':
+                athletes = [a for a in athletes if len(a['edirne_events']) > 0]
+
+            # Sort by top3 within region
+            if leg == 'antalya':
+                athletes = sorted(athletes, key=lambda a: -a['antalya_top3'])
+            elif leg == 'edirne':
+                athletes = sorted(athletes, key=lambda a: -a['edirne_top3'])
+            else:
+                athletes = sorted(athletes, key=lambda a: -a['combined_top3'])
+
+            # Apply selection status (similar to main ranking)
+            for a in athletes:
+                combined_events_points = {}
+                for (stroke, dist), data in a.get('combined_events', {}).items():
+                    points = data.get('points', 0) if isinstance(data, dict) else data
+                    combined_events_points[(stroke, dist)] = points
+                a['combined_events_for_ranking'] = combined_events_points
+
+            athletes = apply_selection_status_with_points(athletes)
+
+            # Build response (same format as main ranking)
+            response_athletes = []
+            for athlete in athletes:
+                if leg == 'antalya':
+                    display_top3 = athlete['antalya_top3']
+                elif leg == 'edirne':
+                    display_top3 = athlete['edirne_top3']
+                else:
+                    display_top3 = athlete['combined_top3']
+
+                response_athletes.append({
+                    'athlete_name': athlete['athlete_name'],
+                    'birth_year': athlete['birth_year'],
+                    'gender': athlete['gender'],
+                    'region': athlete['region'],
+                    'city': athlete['city'],
+                    'club': athlete['club'],
+                    'display_top3': display_top3,
+                    'selected': athlete.get('selected', '-'),
+                    'selected_slot': athlete.get('selected_slot', '-'),
+                    'multinations': athlete.get('multinations', False),
+                })
+
+            # Send response
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.end_headers()
+
+            response_json = json.dumps(response_athletes, ensure_ascii=False, indent=2)
+            self.wfile.write(response_json.encode('utf-8'))
+
+        except Exception as e:
+            logger.error(f"Error in /api/regional: {e}", exc_info=True)
             self.send_error(500, str(e))
 
     def handle_clear(self):
