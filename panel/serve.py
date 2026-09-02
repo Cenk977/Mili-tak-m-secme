@@ -34,6 +34,7 @@ from federasyon.scoring_tables import TABLES, POINTS, SELECTION_QUOTAS
 from federasyon.scorer import score_event, score_athlete_row, merge_scores, best_scores_sequence, compute_ranking_key
 from federasyon.ranker import rank_all, rank_group
 from federasyon.multinations import is_multinations
+from federasyon.yildizlar_ranker import select_all_yildizlar
 from config import DB_PATH, TARGET_AGE_GROUPS, COMPETITION_YEAR
 from panel.export import create_rankings_xlsx
 
@@ -566,6 +567,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     a['selected_slot'] = '-'
                     a['multinations'] = False
 
+            # Apply yíldízlar selections
+            athletes = select_all_yildizlar(athletes)
+
             # Transform to API response format
             response_athletes = []
             for athlete in athletes:
@@ -622,6 +626,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'selected': selected,
                     'selected_slot': selected_slot,
                     'multinations': multinations,
+                    'selected_yildiz_multinations': athlete.get('selected_yildiz_multinations', False),
+                    'coach_called_yildiz_multinations': athlete.get('coach_called_yildiz_multinations', False),
+                    'selected_yildiz_comen_cup_aralik': athlete.get('selected_yildiz_comen_cup_aralik', False),
+                    'selected_yildiz_comen_cup_nisan': athlete.get('selected_yildiz_comen_cup_nisan', False),
+                    'coach_called_yildiz_comen_cup_aralik': athlete.get('coach_called_yildiz_comen_cup_aralik', False),
+                    'coach_called_yildiz_comen_cup_nisan': athlete.get('coach_called_yildiz_comen_cup_nisan', False),
+                    'selected_yildiz_central_europe_aralik': athlete.get('selected_yildiz_central_europe_aralik', False),
+                    'selected_yildiz_central_europe_nisan': athlete.get('selected_yildiz_central_europe_nisan', False),
+                    'coach_called_yildiz_central_europe_aralik': athlete.get('coach_called_yildiz_central_europe_aralik', False),
+                    'coach_called_yildiz_central_europe_nisan': athlete.get('coach_called_yildiz_central_europe_nisan', False),
                 })
 
             # Filter out non-selected age groups (2010 and older, 2014 and younger)
