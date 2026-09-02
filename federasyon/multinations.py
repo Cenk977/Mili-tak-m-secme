@@ -10,6 +10,8 @@ Bu sporcular:
   - Kendi seçimlerini bölge kotasından DÜŞÜRÜR (aynı bölge için kotadan yer açar)
 """
 
+from modules.m1_normalize import normalize_for_lookup
+
 # (İsim tam olarak DB'deki gibi olmalı — normalize_for_lookup ile eşleştiriyoruz)
 MULTINATIONS_2026 = {
     # 2011 Kadın
@@ -35,21 +37,21 @@ MULTINATIONS_2026 = {
     ("Yavuz Kaan Satır",     2011, "M"),
 }
 
-# Hızlı lookup için set: (name_lower, birth_year, gender)
+# Hızlı lookup için set: (normalized_name, birth_year, gender)
 _MULTI_SET = {
-    (name.lower().strip(), by, g)
+    (normalize_for_lookup(name), by, g)
     for name, by, g in MULTINATIONS_2026
 }
 
 
 def is_multinations(name: str, birth_year: int, gender: str) -> bool:
     """DB'deki sporcu Multinations listesinde mi?"""
-    return (name.lower().strip(), birth_year, gender) in _MULTI_SET
+    return (normalize_for_lookup(name), birth_year, gender) in _MULTI_SET
 
 
 def multinations_names_by_group() -> dict:
-    """(birth_year, gender) → set of names (lowercase)"""
+    """(birth_year, gender) → set of names (normalized)"""
     result = {}
     for name, by, g in MULTINATIONS_2026:
-        result.setdefault((by, g), set()).add(name.lower().strip())
+        result.setdefault((by, g), set()).add(normalize_for_lookup(name))
     return result

@@ -1,0 +1,159 @@
+INFO:panel.export:Generated XLSX with 582 athletes for leg antalya
+INFO:__main__:"GET /api/export?leg=antalya HTTP/1.1" 200 -
+INFO:__main__:Exported 582 athletes to Excel (antalya)
+INFO:panel.export:Generated XLSX with 1078 athletes for leg combined
+INFO:__main__:"GET /api/export?leg=combined HTTP/1.1" 200 -
+INFO:__main__:Exported 1078 athletes to Excel (combined)
+INFO:panel.export:Generated XLSX with 87 athletes for leg antalya
+INFO:__main__:"GET /api/export?leg=antalya&birth_year=2013&gender=F HTTP/1.1" 200 -
+INFO:__main__:Exported 87 athletes to Excel (antalya)
+INFO:panel.export:Generated XLSX with 764 athletes for leg edirne
+INFO:__main__:"GET /api/export?leg=edirne HTTP/1.1" 200 -
+INFO:__main__:Exported 764 athletes to Excel (edirne)
+INFO:__main__:Read 161609 bytes in 0.00s
+INFO:__main__:Loaded overrides: 10 names, 12 clubs (took 0.00s)
+INFO:modules.m4_mapping:Loaded 4241 clubs from Excel
+INFO:__main__:Parsed 922 athletes, 3973 results from edirne (took 0.98s)
+INFO:__main__:Batch inserted 3973 results into fed_results table (took 0.16s)
+INFO:__main__:Computing best scores from 3245 fed_results
+INFO:__main__:Batch saved 3245 best scores to fed_athlete_best
+INFO:__main__:Computed and saved 3245 best scores (took 0.16s)
+INFO:__main__:TOTAL UPLOAD PROCESS: 4.84s (parse: 0.98s, insert: 0.16s, best: 0.16s)
+INFO:__main__:process_lxf_upload took 4.84s
+INFO:__main__:"POST /upload HTTP/1.1" 200 -
+INFO:__main__:TOTAL HTTP UPLOAD: 4.85s (read: 0.00s, process: 4.84s, response: 0.00s)
+INFO:panel.export:Generated XLSX with 582 athletes for leg antalya
+INFO:__main__:"GET /api/export?leg=antalya HTTP/1.1" 200 -
+INFO:__main__:Exported 582 athletes to Excel (antalya)
+INFO:panel.export:Generated XLSX with 764 athletes for leg edirne
+INFO:__main__:"GET /api/export?leg=edirne HTTP/1.1" 200 -
+INFO:__main__:Exported 764 athletes to Excel (edirne)
+INFO:panel.export:Generated XLSX with 1078 athletes for leg combined
+INFO:__main__:"GET /api/export?leg=combined HTTP/1.1" 200 -
+INFO:__main__:Exported 1078 athletes to Excel (combined)
+INFO:panel.export:Generated XLSX with 160 athletes for leg combined
+INFO:__main__:"GET /api/export?leg=combined&birth_year=2013&gender=F HTTP/1.1" 200 -
+INFO:__main__:Exported 160 athletes to Excel (combined)
+INFO:__main__:"GET / HTTP/1.1" 200 -
+INFO:__main__:"POST /clear HTTP/1.1" 200 -
+INFO:__main__:"GET / HTTP/1.1" 200 -
+INFO:__main__:"GET / HTTP/1.1" 200 -
+INFO:__main__:Read 113904 bytes in 0.00s
+INFO:__main__:Loaded overrides: 10 names, 12 clubs (took 0.00s)
+INFO:__main__:Parsed 763 athletes, 2988 results from antalya (took 0.10s)
+INFO:__main__:Batch inserted 2988 results into fed_results table (took 0.09s)
+INFO:__main__:Computing best scores from 2267 fed_results
+INFO:__main__:Batch saved 2267 best scores to fed_athlete_best
+INFO:__main__:Computed and saved 2267 best scores (took 0.09s)
+INFO:__main__:TOTAL UPLOAD PROCESS: 2.83s (parse: 0.10s, insert: 0.09s, best: 0.09s)
+INFO:__main__:process_lxf_upload took 2.84s
+INFO:__main__:"POST /upload HTTP/1.1" 200 -
+INFO:__main__:TOTAL HTTP UPLOAD: 2.84s (read: 0.00s, process: 2.84s, response: 0.00s)
+INFO:__main__:Read 161589 bytes in 0.00s
+INFO:__main__:Loaded overrides: 10 names, 12 clubs (took 0.00s)
+INFO:__main__:Parsed 922 athletes, 3973 results from edirne (took 0.23s)
+INFO:__main__:Batch inserted 3973 results into fed_results table (took 0.11s)
+INFO:__main__:Computing best scores from 3245 fed_results
+INFO:__main__:Batch saved 3245 best scores to fed_athlete_best
+INFO:__main__:Computed and saved 3245 best scores (took 0.20s)
+INFO:__main__:TOTAL UPLOAD PROCESS: 4.31s (parse: 0.23s, insert: 0.11s, best: 0.20s)
+INFO:__main__:process_lxf_upload took 4.32s
+INFO:__main__:"POST /upload HTTP/1.1" 200 -
+INFO:__main__:TOTAL HTTP UPLOAD: 4.32s (read: 0.00s, process: 4.32s, response: 0.00s)
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=antalya HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=edirne HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined&birth_year=2013 HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined&gender=F HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined&birth_year=2000 HTTP/1.1" 200 -
+INFO:__main__:Deleted 2267 results and 612 best scores for leg 'antalya'
+INFO:__main__:"POST /api/delete-leg HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:Read 113904 bytes in 0.00s
+INFO:__main__:Loaded overrides: 10 names, 12 clubs (took 0.00s)
+INFO:__main__:Parsed 763 athletes, 2988 results from antalya (took 0.12s)
+INFO:__main__:Batch inserted 2988 results into fed_results table (took 0.09s)
+INFO:__main__:Computing best scores from 2267 fed_results
+INFO:__main__:Batch saved 2267 best scores to fed_athlete_best
+INFO:__main__:Computed and saved 2267 best scores (took 0.16s)
+INFO:__main__:TOTAL UPLOAD PROCESS: 3.08s (parse: 0.12s, insert: 0.09s, best: 0.16s)
+INFO:__main__:process_lxf_upload took 3.08s
+INFO:__main__:"POST /upload HTTP/1.1" 200 -
+INFO:__main__:TOTAL HTTP UPLOAD: 3.08s (read: 0.00s, process: 3.08s, response: 0.00s)
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/regional?region=1&leg=combined HTTP/1.1" 200 -
+INFO:__main__:"POST /clear HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined&birth_year=2000 HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:Read 113904 bytes in 0.00s
+INFO:__main__:Loaded overrides: 10 names, 12 clubs (took 0.00s)
+INFO:__main__:Parsed 763 athletes, 2988 results from antalya (took 0.14s)
+INFO:__main__:Batch inserted 2988 results into fed_results table (took 0.06s)
+INFO:__main__:Computing best scores from 2267 fed_results
+INFO:__main__:Batch saved 2267 best scores to fed_athlete_best
+INFO:__main__:Computed and saved 2267 best scores (took 0.08s)
+INFO:__main__:TOTAL UPLOAD PROCESS: 2.91s (parse: 0.14s, insert: 0.06s, best: 0.08s)
+INFO:__main__:process_lxf_upload took 2.91s
+INFO:__main__:"POST /upload HTTP/1.1" 200 -
+INFO:__main__:TOTAL HTTP UPLOAD: 2.91s (read: 0.00s, process: 2.91s, response: 0.00s)
+INFO:__main__:Read 161589 bytes in 0.00s
+INFO:__main__:Loaded overrides: 10 names, 12 clubs (took 0.00s)
+INFO:__main__:Parsed 922 athletes, 3973 results from edirne (took 0.16s)
+INFO:__main__:Batch inserted 3973 results into fed_results table (took 0.09s)
+INFO:__main__:Computing best scores from 3245 fed_results
+INFO:__main__:Batch saved 3245 best scores to fed_athlete_best
+INFO:__main__:Computed and saved 3245 best scores (took 0.13s)
+INFO:__main__:TOTAL UPLOAD PROCESS: 4.00s (parse: 0.16s, insert: 0.09s, best: 0.13s)
+INFO:__main__:process_lxf_upload took 4.00s
+INFO:__main__:"POST /upload HTTP/1.1" 200 -
+INFO:__main__:TOTAL HTTP UPLOAD: 4.01s (read: 0.00s, process: 4.00s, response: 0.00s)
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=antalya HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=edirne HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined&birth_year=1950 HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined&gender=X HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:Deleted 2267 results and 612 best scores for leg 'antalya'
+INFO:__main__:"POST /api/delete-leg HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=antalya HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=antalya HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=edirne HTTP/1.1" 200 -
+INFO:__main__:"GET /api/ranking?leg=combined HTTP/1.1" 200 -
+INFO:__main__:Read 113904 bytes in 0.00s
+INFO:__main__:Loaded overrides: 10 names, 12 clubs (took 0.02s)
+INFO:__main__:Parsed 763 athletes, 2988 results from antalya (took 0.12s)
+INFO:__main__:Batch inserted 2988 results into fed_results table (took 0.08s)
+INFO:__main__:Computing best scores from 2267 fed_results
+INFO:__main__:Batch saved 2267 best scores to fed_athlete_best
+INFO:__main__:Computed and saved 2267 best scores (took 0.15s)
+INFO:__main__:TOTAL UPLOAD PROCESS: 3.05s (parse: 0.12s, insert: 0.08s, best: 0.15s)
+INFO:__main__:process_lxf_upload took 3.05s
+INFO:__main__:"POST /upload HTTP/1.1" 200 -
+INFO:__main__:TOTAL HTTP UPLOAD: 3.06s (read: 0.00s, process: 3.05s, response: 0.00s)
+INFO:__main__:"GET /api/regional?region=0&leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/regional?region=1&leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/regional?region=2&leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/regional?region=3&leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/regional?region=4&leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/regional?region=5&leg=combined HTTP/1.1" 200 -
+INFO:__main__:"GET /api/regional?region=6&leg=combined HTTP/1.1" 200 -
+INFO:panel.export:Generated XLSX with 1078 athletes for leg combined
+INFO:__main__:"GET /api/export?leg=combined HTTP/1.1" 200 -
+INFO:__main__:Exported 1078 athletes to Excel (combined)
+INFO:panel.export:Generated XLSX with 582 athletes for leg antalya
+INFO:__main__:"GET /api/export?leg=antalya HTTP/1.1" 200 -
+INFO:__main__:Exported 582 athletes to Excel (antalya)
+INFO:panel.export:Generated XLSX with 764 athletes for leg edirne
+INFO:__main__:"GET /api/export?leg=edirne HTTP/1.1" 200 -
+INFO:__main__:Exported 764 athletes to Excel (edirne)

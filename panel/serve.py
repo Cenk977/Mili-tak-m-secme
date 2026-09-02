@@ -590,6 +590,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 edirne_events_json = events_to_json(athlete['edirne_events'], athlete.get('edirne_events_time', {}))
                 combined_events_json = events_to_json(athlete['combined_events'], athlete.get('combined_events_time', {}))
 
+                # Only show points and selection status for 2011-2013 birth years (2026 selection age groups)
+                birth_year = athlete['birth_year']
+                if birth_year < 2011 or birth_year > 2013:
+                    # Hide points and selection for ages outside 2011-2013
+                    display_top3 = 0
+                    selected = '-'
+                    selected_slot = '-'
+                    multinations = False
+                else:
+                    # Show points and selection for official age groups (2011-2013)
+                    display_top3 = athlete['combined_top3']
+                    selected = athlete.get('selected', '-')
+                    selected_slot = athlete.get('selected_slot', '-')
+                    multinations = athlete.get('multinations', False)
+
                 response_athletes.append({
                     'athlete_name': athlete['athlete_name'],
                     'birth_year': athlete['birth_year'],
@@ -604,10 +619,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'antalya_events': antalya_events_json,
                     'edirne_events': edirne_events_json,
                     'combined_events': combined_events_json,
-                    'selected': athlete.get('selected', '-'),
-                    'selected_slot': athlete.get('selected_slot', '-'),
-                    'multinations': athlete.get('multinations', False),
+                    'selected': selected,
+                    'selected_slot': selected_slot,
+                    'multinations': multinations,
                 })
+
+            # Filter out non-selected age groups (2010 and older, 2014 and younger)
+            # Only 2011-2013 birth years should have points displayed
+            before_filter = len(response_athletes)
+            response_athletes = [a for a in response_athletes if a['display_top3'] > 0]
+            after_filter = len(response_athletes)
+            if before_filter != after_filter:
+                logger.info(f"Age filter: {before_filter} → {after_filter} athletes")
 
             # Send JSON response
             self.send_response(200)

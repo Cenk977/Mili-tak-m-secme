@@ -494,6 +494,7 @@
                     <input type="file" id="fileInput" accept=".lxf" />
                 </div>
                 <div id="uploadStatus" class="status"></div>
+                <button class="btn btn-danger" id="clearBtn" style="margin-top: 15px;">Veritabanını Temizle</button>
             </div>
 
             <!-- Leg Filter Buttons -->
@@ -857,8 +858,13 @@
 
             noResultsDiv.style.display = 'none';
 
-            // Sort athletes by display_top3 (descending) for ranking
+            // Sort athletes: multinations first, then by display_top3 (descending)
             const sorted = filtered.sort((a, b) => {
+                // Multinations athletes at the top
+                if (a.selected === "MULTINATIONS" && b.selected !== "MULTINATIONS") return -1;
+                if (a.selected !== "MULTINATIONS" && b.selected === "MULTINATIONS") return 1;
+
+                // Then sort by points (descending)
                 const scoreA = a.display_top3 || 0;
                 const scoreB = b.display_top3 || 0;
                 return scoreB - scoreA;
@@ -869,9 +875,6 @@
                 const ranking = idx + 1;
                 const badge = getRankingBadge(ranking);
                 const badgeStatus = athlete.multinations ? 'MULTINATIONS' : (athlete.selected || 'BARAJ_YOK');
-                const multinationsIndicator = athlete.multinations
-                    ? '<span style="margin-left: 5px; font-size: 16px;">⭐</span>'
-                    : '';
                 const points = athlete.display_top3 || 0;
                 const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
                 const genderText = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kadın' : '-';
@@ -879,18 +882,16 @@
                 return `
                     <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}">
                         <div class="col-badge">${badge}</div>
-                        <div class="col-name">
-                            ${athlete.athlete_name}${multinationsIndicator}
-                        </div>
-                        <div class="col-info">
-                            ${athlete.city} (${athlete.club})
-                        </div>
-                        <div class="col-stats">
-                            <span class="points"><strong>${points}</strong></span>
-                            <span class="selection-badge" data-status="${badgeStatus}">
-                                ${athlete.selected_slot || '-'}
-                            </span>
-                            <span class="age-gender">${age} ${genderText}</span>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <div class="col-name">${athlete.athlete_name}</div>
+                            <div class="col-info">${athlete.city} (${athlete.club})</div>
+                            <div class="col-stats" style="margin-top: 3px;">
+                                <span class="points"><strong>${points > 0 ? points : '-'}</strong></span>
+                                <span class="selection-badge" data-status="${badgeStatus}">
+                                    ${athlete.selected_slot || '-'}
+                                </span>
+                                <span class="age-gender">${age} ${genderText}</span>
+                            </div>
                         </div>
                         <div class="col-action">
                             <button class="expand-btn" aria-label="Detayları aç">↓</button>
@@ -984,7 +985,7 @@
                                 ${athlete.city} (${athlete.club})
                             </div>
                             <div class="col-stats">
-                                <span class="points"><strong>${points}</strong></span>
+                                <span class="points"><strong>${points > 0 ? points : '-'}</strong></span>
                                 <span class="selection-badge" data-status="${badgeStatus}">
                                     ${athlete.selected_slot || '-'}
                                 </span>
@@ -1136,6 +1137,16 @@
                     alert('İhraç başarısız');
                 }
             });
+
+            // Clear database button handler
+            const clearBtn = document.getElementById('clearBtn');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function() {
+                    if (confirm('Tüm veritabanı silinecek. Emin misiniz?')) {
+                        clearDatabase();
+                    }
+                });
+            }
 
             // Regional ranking tab handlers
             document.querySelectorAll('.region-tab').forEach(tab => {

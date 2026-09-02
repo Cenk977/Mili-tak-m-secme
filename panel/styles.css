@@ -172,10 +172,10 @@ body {
 /* ===== ATHLETE ROW ===== */
 .athlete-row {
   display: grid;
-  grid-template-columns: 60px 200px 200px 1fr 60px;
-  gap: 12px;
-  padding: 12px;
-  align-items: center;
+  grid-template-columns: 60px 1fr 100px 60px;
+  gap: 15px;
+  padding: 10px 12px;
+  align-items: flex-start;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-row);
   cursor: pointer;
@@ -194,13 +194,15 @@ body {
 }
 
 .col-name {
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-main);
 }
 
 .col-info {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text-secondary);
+  margin-top: 1px;
 }
 
 .col-stats {
