@@ -51,6 +51,36 @@ body {
   padding: 20px;
 }
 
+/* ===== LEG FILTER BUTTONS ===== */
+.leg-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.leg-btn {
+  padding: 8px 16px;
+  border: 2px solid #ccc;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.leg-btn:hover {
+  border-color: #0066cc;
+}
+
+.leg-btn.active {
+  background: #0066cc;
+  color: white;
+  border-color: #0066cc;
+}
+
 /* ===== FILTER BAR ===== */
 .filter-bar {
   display: flex;
@@ -364,6 +394,15 @@ body {
 @media (max-width: 768px) {
   #app {
     padding: 12px;
+  }
+
+  .leg-buttons {
+    flex-wrap: wrap;
+  }
+
+  .leg-btn {
+    flex: 1;
+    min-width: 80px;
   }
 
   .filter-bar {

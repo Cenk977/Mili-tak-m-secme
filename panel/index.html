@@ -476,15 +476,13 @@
                 <div id="uploadStatus" class="status"></div>
             </div>
 
-            <!-- Leg Selection -->
+            <!-- Leg Filter Buttons -->
             <div class="section">
                 <div class="section-title">Yarışma Etabı</div>
-                <div class="filters">
-                    <div class="filter-group">
-                        <button class="btn btn-primary" data-leg="combined" onclick="setLeg(this)">Birleştirilmiş</button>
-                        <button class="btn" data-leg="antalya" onclick="setLeg(this)">Antalya</button>
-                        <button class="btn" data-leg="edirne" onclick="setLeg(this)">Edirne</button>
-                    </div>
+                <div class="leg-buttons">
+                    <button class="leg-btn active" data-leg="combined">Birleşik</button>
+                    <button class="leg-btn" data-leg="antalya">Antalya</button>
+                    <button class="leg-btn" data-leg="edirne">Edirne</button>
                 </div>
             </div>
 
@@ -567,22 +565,6 @@
     <script>
         // Leg selection state
         let currentLeg = 'combined';
-
-        // Set leg selection
-        function setLeg(btn) {
-            const leg = btn.getAttribute('data-leg');
-            currentLeg = leg;
-
-            // Update button styles
-            document.querySelectorAll('[data-leg]').forEach(b => {
-                b.classList.remove('btn-primary');
-                b.classList.add('btn');
-            });
-            btn.classList.remove('btn');
-            btn.classList.add('btn-primary');
-
-            loadRankings();
-        }
 
         // Upload handling
         const uploadArea = document.getElementById('uploadArea');
@@ -908,10 +890,12 @@
                 const birthYear = document.getElementById('birth-year-filter').value;
                 const gender = document.getElementById('gender-filter').value;
                 const searchQuery = document.getElementById('athlete-search').value;
+                const activeLegBtn = document.querySelector('.leg-btn.active');
+                const leg = activeLegBtn?.dataset.leg || 'combined';
 
                 // Build query string
                 const params = new URLSearchParams();
-                params.append('leg', currentLeg);
+                params.append('leg', leg);
                 if (birthYear) params.append('birth_year', birthYear);
                 if (gender) params.append('gender', gender);
 
@@ -974,11 +958,29 @@
                 genderFilter.addEventListener('change', loadRankings);
             }
 
-            // Leg filter
+            // Leg button handlers
+            document.querySelectorAll('.leg-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Remove active from all, add to clicked
+                    document.querySelectorAll('.leg-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Reload rankings with new leg
+                    loadRankings();
+                });
+            });
+
+            // Leg filter dropdown (legacy support)
             const legFilter = document.getElementById('leg-filter');
             if (legFilter) {
                 legFilter.addEventListener('change', function() {
-                    currentLeg = this.value || 'combined';
+                    const selectedLeg = this.value || 'combined';
+                    // Update active button to match dropdown
+                    document.querySelectorAll('.leg-btn').forEach(b => b.classList.remove('active'));
+                    const activeBtn = document.querySelector(`.leg-btn[data-leg="${selectedLeg}"]`);
+                    if (activeBtn) {
+                        activeBtn.classList.add('active');
+                    }
                     loadRankings();
                 });
             }
