@@ -51,7 +51,10 @@ def init_db():
             selected_yildiz_central_europe_aralik BOOLEAN DEFAULT 0,
             selected_yildiz_central_europe_nisan BOOLEAN DEFAULT 0,
             coach_called_yildiz_central_europe_aralik BOOLEAN DEFAULT 0,
-            coach_called_yildiz_central_europe_nisan BOOLEAN DEFAULT 0
+            coach_called_yildiz_central_europe_nisan BOOLEAN DEFAULT 0,
+            selected_federasyon_karma_b1 BOOLEAN DEFAULT 0,
+            selected_federasyon_karma_b2 BOOLEAN DEFAULT 0,
+            selected_federasyon_karma_b3 BOOLEAN DEFAULT 0
         )
     """)
 
