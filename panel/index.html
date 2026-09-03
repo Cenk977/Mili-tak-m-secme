@@ -859,6 +859,42 @@
 
             html += '</div>';
 
+            // Helper function to render events table
+            function renderEventsTable(events, title) {
+                if (!events || Object.keys(events).length === 0) {
+                    return `<div style="color: #999; font-size: 12px; padding: 10px; background: white; border-radius: 4px;">Yarışma kaydı yok</div>`;
+                }
+
+                const sortedRaces = Object.entries(events)
+                    .map(([key, data]) => {
+                        const [stroke, distance] = JSON.parse(key);
+                        const time = data.time !== undefined ? data.time : '-';
+                        return { stroke, distance, time };
+                    })
+                    .sort((a, b) => a.stroke.localeCompare(b.stroke) || a.distance - b.distance);
+
+                let html = `<div style="margin-bottom: 15px;">`;
+                html += `<strong style="display: block; margin-bottom: 8px; font-size: 13px;">${title}</strong>`;
+                html += `<table class="events-table" style="width: 100%; border-collapse: collapse;">`;
+                html += `<thead><tr style="background: #f0f0f0; border-bottom: 1px solid #ccc;"><th style="text-align: left; padding: 6px; font-size: 12px;">Stil</th><th style="text-align: left; padding: 6px; font-size: 12px;">Mesafe</th><th style="text-align: center; padding: 6px; font-size: 12px;">Derece</th></tr></thead>`;
+                html += `<tbody>`;
+                sortedRaces.forEach((race) => {
+                    html += `<tr style="border-bottom: 1px solid #eee; font-size: 12px;">
+                        <td style="padding: 6px;">${race.stroke}</td>
+                        <td style="padding: 6px;">${race.distance}m</td>
+                        <td style="text-align: center; padding: 6px; font-family: monospace; color: #666;">${race.time}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table></div>`;
+                return html;
+            }
+
+            // Show Aralık (Antalya) events
+            html += renderEventsTable(athlete.antalya_events, '📅 Aralık 2025 (Antalya)');
+
+            // Show Nisan (Edirne) events
+            html += renderEventsTable(athlete.edirne_events, '📅 Nisan 2026 (Edirne)');
+
             // Parse combined_events and show all with their points
             const combined_events = athlete.combined_events || {};
             if (Object.keys(combined_events).length > 0) {
@@ -962,6 +998,29 @@
                 const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
                 const genderText = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kadın' : '-';
 
+                // Compute yildizlar status badges based on leg filter (use global currentLeg)
+                let multinationsSelected = false;
+                let comenCupSelected = false;
+                let centralSelected = false;
+                let federasyonKarmaSelected = false;
+
+                if (currentLeg === 'antalya') {
+                    // Antalya = Aralık seçme = Multi only
+                    multinationsSelected = athlete.selected_yildiz_multinations;
+                } else if (currentLeg === 'edirne') {
+                    // Edirne = Nisan seçme = Comen + Central only
+                    comenCupSelected = athlete.selected_yildiz_comen_cup_aralik || athlete.selected_yildiz_comen_cup_nisan;
+                    centralSelected = athlete.selected_yildiz_central_europe_aralik || athlete.selected_yildiz_central_europe_nisan;
+                } else {
+                    // Combined = all
+                    multinationsSelected = athlete.selected_yildiz_multinations;
+                    comenCupSelected = athlete.selected_yildiz_comen_cup_aralik || athlete.selected_yildiz_comen_cup_nisan;
+                    centralSelected = athlete.selected_yildiz_central_europe_aralik || athlete.selected_yildiz_central_europe_nisan;
+                }
+
+                // Federasyon Karma (always shown, independent of leg)
+                federasyonKarmaSelected = athlete.selected_federasyon_karma_b1 || athlete.selected_federasyon_karma_b2 || athlete.selected_federasyon_karma_b3;
+
                 return `
                     <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}" onclick="toggleDetailRow(this.dataset.athleteName)" style="cursor: pointer;">
                         <div class="col-badge">${badge}</div>
@@ -974,6 +1033,10 @@
                                     ${athlete.selected_slot || '-'}
                                 </span>
                                 <span class="age-gender">${age} ${genderText}</span>
+                                ${multinationsSelected ? '<span style="display: inline-block; margin-left: 6px; background: #c2185b; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">MULTI</span>' : ''}
+                                ${comenCupSelected ? '<span style="display: inline-block; margin-left: 4px; background: #1976d2; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">COMEN</span>' : ''}
+                                ${centralSelected ? '<span style="display: inline-block; margin-left: 4px; background: #388e3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">CENTRAL</span>' : ''}
+                                ${federasyonKarmaSelected ? '<span style="display: inline-block; margin-left: 4px; background: #f57c00; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">FED.KARMA</span>' : ''}
                             </div>
                         </div>
                         <div class="col-action">
@@ -1058,6 +1121,25 @@
                     const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
                     const genderText = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kadın' : '-';
 
+                    // Compute yildizlar status badges based on leg filter (use global currentLeg)
+                    let multinationsSelected = false;
+                    let comenCupSelected = false;
+                    let centralSelected = false;
+
+                    if (currentLeg === 'antalya') {
+                        // Antalya = Aralık seçme = Multi only
+                        multinationsSelected = athlete.selected_yildiz_multinations;
+                    } else if (currentLeg === 'edirne') {
+                        // Edirne = Nisan seçme = Comen + Central only
+                        comenCupSelected = athlete.selected_yildiz_comen_cup_aralik || athlete.selected_yildiz_comen_cup_nisan;
+                        centralSelected = athlete.selected_yildiz_central_europe_aralik || athlete.selected_yildiz_central_europe_nisan;
+                    } else {
+                        // Combined = all
+                        multinationsSelected = athlete.selected_yildiz_multinations;
+                        comenCupSelected = athlete.selected_yildiz_comen_cup_aralik || athlete.selected_yildiz_comen_cup_nisan;
+                        centralSelected = athlete.selected_yildiz_central_europe_aralik || athlete.selected_yildiz_central_europe_nisan;
+                    }
+
                     return `
                         <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}">
                             <div class="col-badge">${badge}</div>
@@ -1073,6 +1155,10 @@
                                     ${athlete.selected_slot || '-'}
                                 </span>
                                 <span class="age-gender">${age} ${genderText}</span>
+                                ${multinationsSelected ? '<span style="display: inline-block; margin-left: 6px; background: #c2185b; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">MULTI</span>' : ''}
+                                ${comenCupSelected ? '<span style="display: inline-block; margin-left: 4px; background: #1976d2; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">COMEN</span>' : ''}
+                                ${centralSelected ? '<span style="display: inline-block; margin-left: 4px; background: #388e3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">CENTRAL</span>' : ''}
+                                ${federasyonKarmaSelected ? '<span style="display: inline-block; margin-left: 4px; background: #f57c00; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">FED.KARMA</span>' : ''}
                             </div>
                             <div class="col-action">
                             </div>
@@ -1190,6 +1276,7 @@
             if (legFilter) {
                 legFilter.addEventListener('change', function() {
                     const selectedLeg = this.value || 'combined';
+                    currentLeg = selectedLeg;
                     // Update active button to match dropdown
                     document.querySelectorAll('.leg-btn').forEach(b => b.classList.remove('active'));
                     const activeBtn = document.querySelector(`.leg-btn[data-leg="${selectedLeg}"]`);
