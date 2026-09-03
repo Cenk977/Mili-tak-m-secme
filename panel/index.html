@@ -963,7 +963,7 @@
                 const genderText = athlete.gender === 'M' ? 'Erkek' : athlete.gender === 'F' ? 'Kadın' : '-';
 
                 return `
-                    <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}">
+                    <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}" onclick="toggleDetailRow(this.dataset.athleteName)" style="cursor: pointer;">
                         <div class="col-badge">${badge}</div>
                         <div style="display: flex; flex-direction: column; gap: 2px;">
                             <div class="col-name">${athlete.athlete_name}</div>

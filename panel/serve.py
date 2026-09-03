@@ -322,6 +322,21 @@ def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
         t_parse = time.time() - t0
         logger.info(f"Parsed {len(athletes)} athletes, {len(results)} results from {race_leg} (took {t_parse:.2f}s)")
 
+        # DEBUG: write parsing results to file
+        with open('/tmp/parse_debug.txt', 'w') as f:
+            f.write(f"Parsed {len(athletes)} athletes, {len(results)} results\n")
+            f.write(f"Sample athletes:\n")
+            for i, a in enumerate(athletes[:5]):
+                f.write(f"  [{i}] {a.get('firstname')} {a.get('lastname')} (ID: {a.get('athlete_id')})\n")
+
+            # Find Cem Eren
+            for a in athletes:
+                if 'CEM' in a.get('firstname', '').upper() and 'EREN' in a.get('lastname', '').upper():
+                    f.write(f"\nFOUND CEM EREN: ID {a.get('athlete_id')}\n")
+                    # Count his results
+                    count = len([r for r in results if r.get('athlete_id') == a.get('athlete_id')])
+                    f.write(f"  Results count: {count}\n")
+
         # Batch collect all fed_results to insert
         fed_results_batch = []
         fed_athletes = {}  # Track unique athletes for fed_athlete_best later
@@ -337,6 +352,16 @@ def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
 
             if not athlete_results:
                 continue
+
+            # DEBUG: check if this is Cem Eren (with any encoding)
+            full_check = f"{athlete.get('firstname', '')} {athlete.get('lastname', ''.upper())}".upper()
+            if 'CEM' in full_check and 'EREN' in full_check:
+                with open('/tmp/cem_eren_debug.txt', 'w') as f:
+                    f.write(f"FOUND CEM EREN!\n")
+                    f.write(f"Raw name: firstname='{athlete.get('firstname', '')}' lastname='{athlete.get('lastname', '')}'\n")
+                    f.write(f"Athlete results: {len(athlete_results)} items\n")
+                    for i, r in enumerate(athlete_results):
+                        f.write(f"  [{i}] {r.get('stroke')} {r.get('distance')}m: {r.get('time_text')} ({r.get('time_seconds')}s)\n")
 
             # Normalize and insert results
             for result in athlete_results:
@@ -358,7 +383,7 @@ def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
                     'club': athlete.get('club_name', 'Unknown'),
                 }
 
-            # Batch collect each result into fed_results
+            # Batch collect each result into fed_results (without filtering - SQL will deduplicate later)
             for result in athlete_results:
                 fed_result = {
                     'race_leg': race_leg,
@@ -383,6 +408,36 @@ def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
         fed_results_count = batch_insert_fed_results(fed_results_batch)
         t_insert = time.time() - t0
         logger.info(f"Batch inserted {fed_results_count} results into fed_results table (took {t_insert:.2f}s)")
+
+        # Deduplicate fed_results: keep only best (fastest) time for each (athlete, stroke, distance)
+        try:
+            from database import get_connection
+            conn = get_connection()
+
+            # For each (athlete_name, stroke, distance), find and keep only the one with lowest time_seconds
+            conn.execute("""
+                DELETE FROM fed_results WHERE id IN (
+                    SELECT r1.id FROM fed_results r1
+                    INNER JOIN (
+                        SELECT athlete_name, stroke, distance, MIN(time_seconds) as min_time
+                        FROM fed_results
+                        WHERE race_leg = ?
+                        GROUP BY athlete_name, stroke, distance
+                        HAVING COUNT(*) > 1
+                    ) dup ON r1.athlete_name = dup.athlete_name
+                           AND r1.stroke = dup.stroke
+                           AND r1.distance = dup.distance
+                           AND r1.time_seconds > dup.min_time
+                    WHERE r1.race_leg = ?
+                )
+            """, (race_leg, race_leg))
+
+            conn.commit()
+            deleted = conn.total_changes
+            conn.close()
+            logger.info(f"Deduplicated fed_results: deleted {deleted} slower duplicate times")
+        except Exception as e:
+            logger.warning(f"Deduplication failed: {e}")
 
         # Compute and save best scores
         t0 = time.time()

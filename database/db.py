@@ -101,8 +101,7 @@ def init_db():
             time_text TEXT,
             time_seconds REAL,
             points INTEGER,
-            source_pdf_seq INTEGER,
-            UNIQUE(race_leg, athlete_name, birth_year, stroke, distance)
+            source_pdf_seq INTEGER
         )
     """)
 
@@ -574,7 +573,7 @@ def batch_insert_fed_results(results_list: list) -> int:
         count = 0
         for result_dict in results_list:
             conn.execute("""
-                INSERT OR REPLACE INTO fed_results (
+                INSERT INTO fed_results (
                     race_leg, race_date, athlete_name, birth_year, gender,
                     region, city, club, stroke, distance,
                     time_text, time_seconds, points, source_pdf_seq
