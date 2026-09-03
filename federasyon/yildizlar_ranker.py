@@ -36,6 +36,30 @@ def parse_time(time_str: str) -> float:
         return float('inf')
 
 
+def get_second_place_athletes(event_key: tuple, eligible_athletes: list, event_times_key: str = 'combined_events_time') -> dict:
+    """
+    Get 2nd place athlete for a specific event.
+    Returns: {'athlete_id': str, 'time_sec': float, 'time_text': str}
+    """
+    times_list = []
+    for a in eligible_athletes:
+        time_str = a.get(event_times_key, {}).get(event_key)
+        time_sec = parse_time(time_str)
+        if time_sec != float('inf'):
+            times_list.append({
+                'athlete_id': a.get('athlete_id'),
+                'time_sec': time_sec,
+                'time_text': time_str,
+                'athlete_name': a.get('athlete_name')
+            })
+
+    if len(times_list) < 2:
+        return None
+
+    times_list.sort(key=lambda x: x['time_sec'])
+    return times_list[1] if len(times_list) > 1 else None
+
+
 def count_first_places(athlete_id: int, eligible_athletes: list, event_times_key: str = 'combined_events_time') -> int:
     """
     Count how many events (branş/mesafe) this athlete placed 1st in.
@@ -139,6 +163,7 @@ def select_yildizlar_comen_cup_aralik(athletes):
     Age: F 2013–2011, M 2012–2010
     Selection: All branş birincileri (athletes with at least 1 first place)
     Source: ARALYK (antalya_events_time) - NOT combined
+    Extra rule: Athletes with >4 first places → add 2nd place for 5th+ birincilik
     """
     females = [
         a for a in athletes
@@ -163,7 +188,42 @@ def select_yildizlar_comen_cup_aralik(athletes):
     selected_females.sort(key=lambda x: x.get('_temp_first_places', 0), reverse=True)
     selected_males.sort(key=lambda x: x.get('_temp_first_places', 0), reverse=True)
 
+    # Extra rule: Athletes with >4 first places → add 2nd place for 5th+ birincilik
+    # "4'ten fazla birincilik alan sporcu olur ise, dört yarış dışında kalan yarış için ikinci olan sporcu kadroya davet edilir"
+    second_place_additions = set()
+
+    for athlete in selected_females + selected_males:
+        first_place_count = athlete.get('_temp_first_places', 0)
+        if first_place_count > 4:
+            # This athlete has >4 first places
+            # For 5th+ first place, add the 2nd place finisher
+            event_keys = list(athlete.get('antalya_events_time', {}).keys())
+
+            first_place_events = []
+            for event_key in event_keys:
+                # Check if this athlete is 1st in this event (within gender + age group)
+                best_time = float('inf')
+                best_athlete_id = None
+                for a in (females if athlete['gender'] == 'F' else males):
+                    time_str = a.get('antalya_events_time', {}).get(event_key)
+                    time_sec = parse_time(time_str)
+                    if time_sec < best_time:
+                        best_time = time_sec
+                        best_athlete_id = a.get('athlete_id')
+
+                if best_athlete_id == athlete.get('athlete_id'):
+                    first_place_events.append(event_key)
+
+            # For events beyond 4th first place, add 2nd place finisher
+            if len(first_place_events) > 4:
+                for i, event_key in enumerate(first_place_events[4:], start=5):  # 5th onward
+                    second_place = get_second_place_athletes(event_key, females if athlete['gender'] == 'F' else males, 'antalya_events_time')
+                    if second_place:
+                        second_place_additions.add(second_place['athlete_id'])
+                        logger.info(f"Extra: Added 2nd place {second_place['athlete_name']} for {event_key[0]} {event_key[1]}m (athlete {athlete['athlete_name']} has {first_place_count} 1st places)")
+
     eligible_ids = {a.get('athlete_id') for a in selected_females + selected_males}
+    eligible_ids.update(second_place_additions)
 
     for athlete in athletes:
         if athlete.get('athlete_id') in eligible_ids:
@@ -217,7 +277,42 @@ def select_yildizlar_comen_cup_nisan(athletes):
     selected_females.sort(key=lambda x: x.get('_temp_first_places', 0), reverse=True)
     selected_males.sort(key=lambda x: x.get('_temp_first_places', 0), reverse=True)
 
+    # Extra rule: Athletes with >4 first places → add 2nd place for 5th+ birincilik
+    # "4'ten fazla birincilik alan sporcu olur ise, dört yarış dışında kalan yarış için ikinci olan sporcu kadroya davet edilir"
+    second_place_additions = set()
+
+    for athlete in selected_females + selected_males:
+        first_place_count = athlete.get('_temp_first_places', 0)
+        if first_place_count > 4:
+            # This athlete has >4 first places
+            # For 5th+ first place, add the 2nd place finisher
+            event_keys = list(athlete.get('edirne_events_time', {}).keys())
+
+            first_place_events = []
+            for event_key in event_keys:
+                # Check if this athlete is 1st in this event
+                best_time = float('inf')
+                best_athlete_id = None
+                for a in (females if athlete['gender'] == 'F' else males):
+                    time_str = a.get('edirne_events_time', {}).get(event_key)
+                    time_sec = parse_time(time_str)
+                    if time_sec < best_time:
+                        best_time = time_sec
+                        best_athlete_id = a.get('athlete_id')
+
+                if best_athlete_id == athlete.get('athlete_id'):
+                    first_place_events.append(event_key)
+
+            # For events beyond 4th first place, add 2nd place finisher
+            if len(first_place_events) > 4:
+                for i, event_key in enumerate(first_place_events[4:], start=5):  # 5th onward
+                    second_place = get_second_place_athletes(event_key, females if athlete['gender'] == 'F' else males, 'edirne_events_time')
+                    if second_place:
+                        second_place_additions.add(second_place['athlete_id'])
+                        logger.info(f"Extra: Added 2nd place {second_place['athlete_name']} for {event_key[0]} {event_key[1]}m (athlete {athlete['athlete_name']} has {first_place_count} 1st places)")
+
     eligible_ids = {a.get('athlete_id') for a in selected_females + selected_males}
+    eligible_ids.update(second_place_additions)
 
     for athlete in athletes:
         if athlete.get('athlete_id') in eligible_ids:
@@ -294,6 +389,7 @@ def select_yildizlar_central_europe_nisan(athletes):
     Age: 2013–2011 (both genders)
     Cadre: Top 12F + 12M by 1st place count (combined Aralık + Nisan)
     Source: NİSAN (edirne_events_time) - NOT combined (her yarış kendi verilerine bakılır)
+    Extra rule: Athletes with >4 first places → add 2nd place for 5th+ birincilik
     """
     eligible = [a for a in athletes if 2011 <= a.get('birth_year') <= 2013]
 
@@ -312,6 +408,42 @@ def select_yildizlar_central_europe_nisan(athletes):
 
     selected = females_sorted[:12] + males_sorted[:12]
     selected_ids = {a.get('athlete_id') for a in selected}
+
+    # Extra rule: Athletes with >4 first places → add 2nd place for 5th+ birincilik
+    # "4'ten fazla birincilik alan sporcu olur ise, dört yarış dışında kalan yarış için ikinci olan sporcu kadroya davet edilir"
+    second_place_additions = set()
+
+    for athlete in selected:
+        first_place_count = athlete.get('_temp_first_places', 0)
+        if first_place_count > 4:
+            # This athlete has >4 first places
+            # For 5th+ first place, add the 2nd place finisher
+            event_keys = list(athlete.get('edirne_events_time', {}).keys())
+
+            first_place_events = []
+            for event_key in event_keys:
+                # Check if this athlete is 1st in this event (within gender + age group)
+                best_time = float('inf')
+                best_athlete_id = None
+                for a in (females if athlete['gender'] == 'F' else males):
+                    time_str = a.get('edirne_events_time', {}).get(event_key)
+                    time_sec = parse_time(time_str)
+                    if time_sec < best_time:
+                        best_time = time_sec
+                        best_athlete_id = a.get('athlete_id')
+
+                if best_athlete_id == athlete.get('athlete_id'):
+                    first_place_events.append(event_key)
+
+            # For events beyond 4th first place, add 2nd place finisher
+            if len(first_place_events) > 4:
+                for i, event_key in enumerate(first_place_events[4:], start=5):  # 5th onward
+                    second_place = get_second_place_athletes(event_key, females if athlete['gender'] == 'F' else males, 'edirne_events_time')
+                    if second_place:
+                        second_place_additions.add(second_place['athlete_id'])
+                        logger.info(f"Extra: Added 2nd place {second_place['athlete_name']} for {event_key[0]} {event_key[1]}m (athlete {athlete['athlete_name']} has {first_place_count} 1st places)")
+
+    selected_ids.update(second_place_additions)
 
     for athlete in athletes:
         if athlete.get('athlete_id') in selected_ids:
