@@ -341,18 +341,19 @@ def select_yildizlar_central_europe_aralik(athletes):
     Central European December selection (20-22 Aralık 2025).
     Age: 2013–2011 (both genders)
     Cadre: Top 12F + 12M by 1st place count
-    Source: ARALYK (antalya_events_time) - NOT combined
+    Source: COMBINED (combined_events_time) - "her branş ve mesafede en iyi dereceye sahip sporculardan"
+    Note: 4+ birincilik kuralı combined veriler üzerinden calculate edilir (Aralık + Nisan merged)
     """
     eligible = [a for a in athletes if 2011 <= a.get('birth_year') <= 2013]
 
     females = [a for a in eligible if a.get('gender') == 'F']
     males = [a for a in eligible if a.get('gender') == 'M']
 
-    # Count 1st places within gender group - use ARALYK (antalya) data only
+    # Count 1st places within gender group - use COMBINED data (Aralık + Nisan merged)
     for athlete in females:
-        athlete['_temp_first_places'] = count_first_places(athlete.get('athlete_id'), females, 'antalya_events_time')
+        athlete['_temp_first_places'] = count_first_places(athlete.get('athlete_id'), females, 'combined_events_time')
     for athlete in males:
-        athlete['_temp_first_places'] = count_first_places(athlete.get('athlete_id'), males, 'antalya_events_time')
+        athlete['_temp_first_places'] = count_first_places(athlete.get('athlete_id'), males, 'combined_events_time')
 
     # Sort by 1st place count
     females_sorted = sorted(females, key=lambda x: x.get('_temp_first_places', 0), reverse=True)
@@ -360,6 +361,42 @@ def select_yildizlar_central_europe_aralik(athletes):
 
     selected = females_sorted[:12] + males_sorted[:12]
     selected_ids = {a.get('athlete_id') for a in selected}
+
+    # Extra rule: Athletes with >4 first places (combined) → add 2nd place for 5th+ birincilik
+    # "4'ten fazla birincilik alan sporcu olur ise, dört yarış dışında kalan yarış için ikinci olan sporcu kadroya davet edilir"
+    second_place_additions = set()
+
+    for athlete in selected:
+        first_place_count = athlete.get('_temp_first_places', 0)
+        if first_place_count > 4:
+            # This athlete has >4 first places (from COMBINED data)
+            # For 5th+ first place, add the 2nd place finisher
+            event_keys = list(athlete.get('combined_events_time', {}).keys())
+
+            first_place_events = []
+            for event_key in event_keys:
+                # Check if this athlete is 1st in this event (within gender + age group, using COMBINED data)
+                best_time = float('inf')
+                best_athlete_id = None
+                for a in (females if athlete['gender'] == 'F' else males):
+                    time_str = a.get('combined_events_time', {}).get(event_key)
+                    time_sec = parse_time(time_str)
+                    if time_sec < best_time:
+                        best_time = time_sec
+                        best_athlete_id = a.get('athlete_id')
+
+                if best_athlete_id == athlete.get('athlete_id'):
+                    first_place_events.append(event_key)
+
+            # For events beyond 4th first place, add 2nd place finisher (using COMBINED data)
+            if len(first_place_events) > 4:
+                for i, event_key in enumerate(first_place_events[4:], start=5):  # 5th onward
+                    second_place = get_second_place_athletes(event_key, females if athlete['gender'] == 'F' else males, 'combined_events_time')
+                    if second_place:
+                        second_place_additions.add(second_place['athlete_id'])
+                        logger.info(f"Extra: Added 2nd place {second_place['athlete_name']} for {event_key[0]} {event_key[1]}m (athlete {athlete['athlete_name']} has {first_place_count} 1st places)")
+
+    selected_ids.update(second_place_additions)
 
     for athlete in athletes:
         if athlete.get('athlete_id') in selected_ids:
@@ -388,19 +425,19 @@ def select_yildizlar_central_europe_nisan(athletes):
     Central European April selection (17-19 Nisan 2026).
     Age: 2013–2011 (both genders)
     Cadre: Top 12F + 12M by 1st place count (combined Aralık + Nisan)
-    Source: NİSAN (edirne_events_time) - NOT combined (her yarış kendi verilerine bakılır)
-    Extra rule: Athletes with >4 first places → add 2nd place for 5th+ birincilik
+    Source: COMBINED (combined_events_time) - "her branş ve mesafede en iyi dereceye sahip sporculardan"
+    Extra rule: Athletes with >4 first places (combined) → add 2nd place for 5th+ birincilik
     """
     eligible = [a for a in athletes if 2011 <= a.get('birth_year') <= 2013]
 
     females = [a for a in eligible if a.get('gender') == 'F']
     males = [a for a in eligible if a.get('gender') == 'M']
 
-    # Count 1st places within gender group - use NİSAN (edirne) data only
+    # Count 1st places within gender group - use COMBINED data (Aralık + Nisan merged)
     for athlete in females:
-        athlete['_temp_first_places'] = count_first_places(athlete.get('athlete_id'), females, 'edirne_events_time')
+        athlete['_temp_first_places'] = count_first_places(athlete.get('athlete_id'), females, 'combined_events_time')
     for athlete in males:
-        athlete['_temp_first_places'] = count_first_places(athlete.get('athlete_id'), males, 'edirne_events_time')
+        athlete['_temp_first_places'] = count_first_places(athlete.get('athlete_id'), males, 'combined_events_time')
 
     # Sort by 1st place count
     females_sorted = sorted(females, key=lambda x: x.get('_temp_first_places', 0), reverse=True)
@@ -416,17 +453,17 @@ def select_yildizlar_central_europe_nisan(athletes):
     for athlete in selected:
         first_place_count = athlete.get('_temp_first_places', 0)
         if first_place_count > 4:
-            # This athlete has >4 first places
+            # This athlete has >4 first places (from COMBINED data)
             # For 5th+ first place, add the 2nd place finisher
-            event_keys = list(athlete.get('edirne_events_time', {}).keys())
+            event_keys = list(athlete.get('combined_events_time', {}).keys())
 
             first_place_events = []
             for event_key in event_keys:
-                # Check if this athlete is 1st in this event (within gender + age group)
+                # Check if this athlete is 1st in this event (within gender + age group, using COMBINED data)
                 best_time = float('inf')
                 best_athlete_id = None
                 for a in (females if athlete['gender'] == 'F' else males):
-                    time_str = a.get('edirne_events_time', {}).get(event_key)
+                    time_str = a.get('combined_events_time', {}).get(event_key)
                     time_sec = parse_time(time_str)
                     if time_sec < best_time:
                         best_time = time_sec
@@ -435,10 +472,10 @@ def select_yildizlar_central_europe_nisan(athletes):
                 if best_athlete_id == athlete.get('athlete_id'):
                     first_place_events.append(event_key)
 
-            # For events beyond 4th first place, add 2nd place finisher
+            # For events beyond 4th first place, add 2nd place finisher (using COMBINED data)
             if len(first_place_events) > 4:
                 for i, event_key in enumerate(first_place_events[4:], start=5):  # 5th onward
-                    second_place = get_second_place_athletes(event_key, females if athlete['gender'] == 'F' else males, 'edirne_events_time')
+                    second_place = get_second_place_athletes(event_key, females if athlete['gender'] == 'F' else males, 'combined_events_time')
                     if second_place:
                         second_place_additions.add(second_place['athlete_id'])
                         logger.info(f"Extra: Added 2nd place {second_place['athlete_name']} for {event_key[0]} {event_key[1]}m (athlete {athlete['athlete_name']} has {first_place_count} 1st places)")
