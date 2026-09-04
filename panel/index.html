@@ -1125,6 +1125,7 @@
                     let multinationsSelected = false;
                     let comenCupSelected = false;
                     let centralSelected = false;
+                    let federasyonKarmaSelected = false;
 
                     if (currentLeg === 'antalya') {
                         // Antalya = Aralık seçme = Multi only
@@ -1139,6 +1140,9 @@
                         comenCupSelected = athlete.selected_yildiz_comen_cup_aralik || athlete.selected_yildiz_comen_cup_nisan;
                         centralSelected = athlete.selected_yildiz_central_europe_aralik || athlete.selected_yildiz_central_europe_nisan;
                     }
+
+                    // Federasyon Karma (always shown, independent of leg)
+                    federasyonKarmaSelected = athlete.selected_federasyon_karma_b1 || athlete.selected_federasyon_karma_b2 || athlete.selected_federasyon_karma_b3;
 
                     return `
                         <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}">

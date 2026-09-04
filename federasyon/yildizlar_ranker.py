@@ -462,10 +462,14 @@ def select_federasyon_karma(athletes):
 
             # Select top N per gender by quota
             for i, female in enumerate(females[:quota_f]):
-                female['selected_federasyon_karma_b1'] = True
+                field_name = f'selected_federasyon_karma_b{region}'
+                female[field_name] = True
+                female['selected_slot'] = f'B{region}-{i+1}'
 
             for i, male in enumerate(males[:quota_m]):
-                male['selected_federasyon_karma_b1'] = True
+                field_name = f'selected_federasyon_karma_b{region}'
+                male[field_name] = True
+                male['selected_slot'] = f'B{region}-{i+1}'
 
     # Cleanup temp fields
     for a in athletes:

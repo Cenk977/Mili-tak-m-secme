@@ -323,7 +323,8 @@ def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
         logger.info(f"Parsed {len(athletes)} athletes, {len(results)} results from {race_leg} (took {t_parse:.2f}s)")
 
         # DEBUG: write parsing results to file
-        with open('/tmp/parse_debug.txt', 'w') as f:
+        debug_file = Path(tempfile.gettempdir()) / 'parse_debug.txt'
+        with open(debug_file, 'w') as f:
             f.write(f"Parsed {len(athletes)} athletes, {len(results)} results\n")
             f.write(f"Sample athletes:\n")
             for i, a in enumerate(athletes[:5]):
@@ -356,7 +357,8 @@ def process_lxf_upload(file_path: str, race_leg: str = 'antalya') -> dict:
             # DEBUG: check if this is Cem Eren (with any encoding)
             full_check = f"{athlete.get('firstname', '')} {athlete.get('lastname', ''.upper())}".upper()
             if 'CEM' in full_check and 'EREN' in full_check:
-                with open('/tmp/cem_eren_debug.txt', 'w') as f:
+                debug_file = Path(tempfile.gettempdir()) / 'cem_eren_debug.txt'
+                with open(debug_file, 'w') as f:
                     f.write(f"FOUND CEM EREN!\n")
                     f.write(f"Raw name: firstname='{athlete.get('firstname', '')}' lastname='{athlete.get('lastname', '')}'\n")
                     f.write(f"Athlete results: {len(athlete_results)} items\n")
