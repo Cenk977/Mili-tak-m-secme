@@ -90,6 +90,155 @@ def migrate_add_selection_columns():
         conn.close()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CRUD for athlete selection
+# ─────────────────────────────────────────────────────────────────────────────
+
+def upsert_fed_results(athlete: dict, race_leg: str = 'milli_takim'):
+    """
+    Insert athlete's event results into fed_results table.
+    Each (stroke, distance) from event_scores → one row.
+    """
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        name = athlete.get('name', '')
+        birth_year = athlete.get('birth_year')
+        gender = athlete.get('gender', '')
+        region = athlete.get('region')
+        city = athlete.get('city', '')
+        club = athlete.get('club', '')
+        event_scores = athlete.get('event_scores', {})
+        selected = athlete.get('selected', '-')
+        selected_slot = athlete.get('selected_slot', '-')
+        tied = 1 if athlete.get('tied', False) else 0
+        ranking_key = athlete.get('ranking_key', '')
+
+        for (stroke, distance), points in event_scores.items():
+            cursor.execute("""
+                INSERT OR REPLACE INTO fed_results
+                (race_leg, race_date, athlete_name, birth_year, gender, region, city, club,
+                 stroke, distance, points, selected, selected_slot, tied, ranking_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                race_leg, None, name, birth_year, gender, region, city, club,
+                stroke, distance, points, selected, selected_slot, tied, ranking_key
+            ))
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_athlete_selection(athlete: dict):
+    """
+    Update selection status in fed_athlete_best for all athlete's events.
+    Also ensures athlete is present in fed_athlete_best by populating
+    from fed_results if needed.
+    """
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        name = athlete.get('name', '')
+        birth_year = athlete.get('birth_year')
+        gender = athlete.get('gender', '')
+        region = athlete.get('region')
+        city = athlete.get('city', '')
+        club = athlete.get('club', '')
+        selected = athlete.get('selected', '-')
+        selected_slot = athlete.get('selected_slot', '-')
+
+        # Ensure athlete exists in fed_athlete_best (insert if missing)
+        # First check if athlete exists for this birth_year
+        existing = cursor.execute(
+            "SELECT COUNT(*) FROM fed_athlete_best WHERE athlete_name = ? AND birth_year = ?",
+            (name, birth_year)
+        ).fetchone()
+
+        if existing and existing[0] == 0:
+            # Athlete not in fed_athlete_best, populate from fed_results
+            # Get all unique events for this athlete
+            events = cursor.execute("""
+                SELECT DISTINCT stroke, distance, points, gender, region, city, club
+                FROM fed_results
+                WHERE athlete_name = ? AND birth_year = ?
+                ORDER BY stroke, distance
+            """, (name, birth_year)).fetchall()
+
+            for event in events:
+                stroke, distance, points, g, r, c, cl = event
+                cursor.execute("""
+                    INSERT OR IGNORE INTO fed_athlete_best
+                    (athlete_name, birth_year, gender, region, city, club,
+                     stroke, distance, best_points, selected, selected_slot)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (name, birth_year, g or gender, r or region, c or city, cl or club,
+                      stroke, distance, points or 0, selected, selected_slot))
+
+        # Now update all rows for this athlete with selection info
+        cursor.execute("""
+            UPDATE fed_athlete_best
+            SET selected = ?, selected_slot = ?
+            WHERE athlete_name = ? AND birth_year = ?
+        """, (selected, selected_slot, name, birth_year))
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_selected_athletes(birth_year: int = None, selected: str = None) -> list:
+    """
+    Query selected athletes from fed_athlete_best.
+
+    Args:
+        birth_year: Filter by birth year (optional)
+        selected: Filter by selection status ('TR', 'BÖLGE', 'BARAJ_YOK', '-') (optional)
+
+    Returns:
+        List of athlete dicts with selection info
+    """
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        query = """
+            SELECT DISTINCT athlete_name, birth_year, gender, region, city, club, selected, selected_slot
+            FROM fed_athlete_best
+            WHERE 1=1
+        """
+        params = []
+
+        if birth_year is not None:
+            query += " AND birth_year = ?"
+            params.append(birth_year)
+
+        if selected is not None:
+            query += " AND selected = ?"
+            params.append(selected)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        return [
+            {
+                'name': row[0],
+                'birth_year': row[1],
+                'gender': row[2],
+                'region': row[3],
+                'city': row[4],
+                'club': row[5],
+                'selected': row[6],
+                'selected_slot': row[7]
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
 def get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
