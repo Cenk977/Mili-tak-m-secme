@@ -69,6 +69,27 @@ CREATE TABLE IF NOT EXISTS fed_athlete_best (
 """
 
 
+def migrate_add_selection_columns():
+    """Add selection-related columns to fed_results and fed_athlete_best tables"""
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        # fed_results table — add 4 columns
+        _add_column_if_missing(conn, "fed_results", "selected", "TEXT DEFAULT '-'")
+        _add_column_if_missing(conn, "fed_results", "selected_slot", "TEXT DEFAULT '-'")
+        _add_column_if_missing(conn, "fed_results", "tied", "BOOLEAN DEFAULT 0")
+        _add_column_if_missing(conn, "fed_results", "ranking_key", "TEXT")
+
+        # fed_athlete_best table — add 2 columns
+        _add_column_if_missing(conn, "fed_athlete_best", "selected", "TEXT DEFAULT '-'")
+        _add_column_if_missing(conn, "fed_athlete_best", "selected_slot", "TEXT DEFAULT '-'")
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row

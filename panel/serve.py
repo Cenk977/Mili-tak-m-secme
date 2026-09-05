@@ -1041,6 +1041,10 @@ def main():
     """Start HTTP server."""
     init_db()
 
+    # Run database migrations
+    from federasyon.db_fed import migrate_add_selection_columns
+    migrate_add_selection_columns()
+
     server = HTTPServer(('localhost', 8765), DashboardHandler)
     print("=" * 60)
     print("Milli Takım Seçme — Dashboard")
