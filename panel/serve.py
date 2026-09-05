@@ -1007,15 +1007,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_error(400, "No file content found")
                 return
 
-            # Process LXF using MiltiTakimPipeline
-            t0 = time.time()
-            pipeline = MiltiTakimPipeline()
-            result = pipeline.process(file_content_bytes)
-            t_process = time.time() - t0
-            logger.info(f"MiltiTakimPipeline.process took {t_process:.2f}s")
-
-            # Clean up temp file
-            Path(file_content_bytes).unlink()
+            # Process LXF using MiltiTakimPipeline (with cleanup in finally block)
+            result = None
+            t_process = 0
+            try:
+                t0 = time.time()
+                pipeline = MiltiTakimPipeline()
+                result = pipeline.process(file_content_bytes)
+                t_process = time.time() - t0
+                logger.info(f"MiltiTakimPipeline.process took {t_process:.2f}s")
+            finally:
+                # Clean up temp file (always happens, even on exception)
+                Path(file_content_bytes).unlink(missing_ok=True)
 
             # Send response
             t0 = time.time()
@@ -1032,7 +1035,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             logger.error(f"Error handling upload: {e}", exc_info=True)
-            self.send_error(500, str(e))
+            # Send JSON error response with 400 status (not HTML error page)
+            self.send_response(400)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.end_headers()
+
+            error_response = {'success': False, 'error': str(e)}
+            response_json = json.dumps(error_response, ensure_ascii=False)
+            self.wfile.write(response_json.encode('utf-8'))
 
 
 def main():

@@ -51,6 +51,7 @@ class TestHandleUploadIntegration:
 
             # Create a mock handler
             handler = MagicMock(spec=DashboardHandler)
+            handler.wfile = Mock()
 
             # Create multipart form data
             boundary = 'boundary123'
@@ -125,13 +126,12 @@ class TestHandleUploadIntegration:
 
             mock_pipeline_instance.process.return_value = mock_response
 
-            handler = MagicMock(spec=DashboardHandler)
-
             # Capture the response JSON
             response_data = []
             def capture_write(data):
                 response_data.append(data)
 
+            handler = MagicMock(spec=DashboardHandler)
             handler.wfile = Mock()
             handler.wfile.write = capture_write
 
@@ -179,6 +179,7 @@ class TestHandleUploadIntegration:
             mock_pipeline_instance.process.side_effect = Exception("Test error")
 
             handler = MagicMock(spec=DashboardHandler)
+            handler.wfile = Mock()
 
             # Create multipart data
             boundary = 'boundary123'
@@ -199,8 +200,95 @@ class TestHandleUploadIntegration:
             with patch('panel.serve.Path.unlink'):
                 DashboardHandler.handle_upload(handler)
 
-            # Verify error was sent
-            handler.send_error.assert_called_once()
+            # Verify response was sent (either send_error or send_response)
+            assert handler.send_response.called or handler.send_error.called
+
+    def test_handle_upload_cleanup_on_error(self):
+        """handle_upload should clean up temp file EVEN when pipeline fails"""
+        from panel.serve import DashboardHandler
+
+        with patch('panel.serve.MiltiTakimPipeline') as mock_pipeline_class:
+            mock_pipeline_instance = MagicMock()
+            mock_pipeline_class.return_value = mock_pipeline_instance
+
+            # Mock pipeline to raise exception
+            mock_pipeline_instance.process.side_effect = Exception("Pipeline error")
+
+            handler = MagicMock(spec=DashboardHandler)
+            handler.wfile = Mock()
+
+            # Create multipart data
+            boundary = 'boundary123'
+            content = (
+                f'--{boundary}\r\n'
+                f'Content-Disposition: form-data; name="file"; filename="test.lxf"\r\n'
+                f'\r\n'
+                f'content'
+                f'\r\n--{boundary}--\r\n'
+            ).encode('utf-8')
+
+            handler.headers = {
+                'Content-Length': str(len(content)),
+                'Content-Type': f'multipart/form-data; boundary={boundary}'
+            }
+            handler.rfile = BytesIO(content)
+
+            # Mock Path.unlink and verify it's called even on error
+            with patch('panel.serve.Path.unlink') as mock_unlink:
+                DashboardHandler.handle_upload(handler)
+
+                # Verify cleanup was called (this should fail before fix)
+                mock_unlink.assert_called_once()
+
+    def test_handle_upload_error_response_is_json(self):
+        """handle_upload should send JSON error response, not HTML"""
+        from panel.serve import DashboardHandler
+
+        with patch('panel.serve.MiltiTakimPipeline') as mock_pipeline_class:
+            mock_pipeline_instance = MagicMock()
+            mock_pipeline_class.return_value = mock_pipeline_instance
+
+            # Mock pipeline to raise exception
+            mock_pipeline_instance.process.side_effect = Exception("Test error")
+
+            handler = MagicMock(spec=DashboardHandler)
+
+            # Capture response
+            response_data = []
+            def capture_write(data):
+                response_data.append(data)
+
+            handler.wfile = Mock()
+            handler.wfile.write = capture_write
+
+            # Create multipart data
+            boundary = 'boundary123'
+            content = (
+                f'--{boundary}\r\n'
+                f'Content-Disposition: form-data; name="file"; filename="test.lxf"\r\n'
+                f'\r\n'
+                f'content'
+                f'\r\n--{boundary}--\r\n'
+            ).encode('utf-8')
+
+            handler.headers = {
+                'Content-Length': str(len(content)),
+                'Content-Type': f'multipart/form-data; boundary={boundary}'
+            }
+            handler.rfile = BytesIO(content)
+
+            with patch('panel.serve.Path.unlink'):
+                DashboardHandler.handle_upload(handler)
+
+            # Verify response was sent with 400 status
+            handler.send_response.assert_called_with(400)
+
+            # Verify JSON response was written (not HTML error page)
+            if response_data:
+                response_json = json.loads(response_data[0].decode('utf-8'))
+                assert 'success' in response_json
+                assert response_json['success'] is False
+                assert 'error' in response_json
 
     def test_handle_upload_no_race_leg_parameter(self):
         """handle_upload should NOT pass race_leg to pipeline"""
@@ -220,6 +308,7 @@ class TestHandleUploadIntegration:
             }
 
             handler = MagicMock(spec=DashboardHandler)
+            handler.wfile = Mock()
 
             # Create multipart data with 'edirne' in filename
             boundary = 'boundary123'
@@ -271,6 +360,7 @@ class TestHandleUploadIntegration:
             }
 
             handler = MagicMock(spec=DashboardHandler)
+            handler.wfile = Mock()
 
             # Create multipart data
             boundary = 'boundary123'
