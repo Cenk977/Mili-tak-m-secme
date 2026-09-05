@@ -35,6 +35,7 @@ from federasyon.scorer import score_event, score_athlete_row, merge_scores, best
 from federasyon.ranker import rank_all, rank_group
 from federasyon.multinations import is_multinations
 from federasyon.yildizlar_ranker import select_all_yildizlar
+from federasyon.pipeline import MiltiTakimPipeline
 from config import DB_PATH, TARGET_AGE_GROUPS, COMPETITION_YEAR
 from panel.export import create_rankings_xlsx
 
@@ -1006,15 +1007,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_error(400, "No file content found")
                 return
 
-            # Process LXF - detect race leg from filename
-            race_leg = 'antalya'  # default
-            if filename and 'edirne' in filename.lower():
-                race_leg = 'edirne'
-
+            # Process LXF using MiltiTakimPipeline
             t0 = time.time()
-            result = process_lxf_upload(file_content_bytes, race_leg=race_leg)
+            pipeline = MiltiTakimPipeline()
+            result = pipeline.process(file_content_bytes)
             t_process = time.time() - t0
-            logger.info(f"process_lxf_upload took {t_process:.2f}s")
+            logger.info(f"MiltiTakimPipeline.process took {t_process:.2f}s")
 
             # Clean up temp file
             Path(file_content_bytes).unlink()
