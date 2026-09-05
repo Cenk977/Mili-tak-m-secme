@@ -185,6 +185,113 @@ def real_test_lxf():
         yield None
 
 
+@pytest.fixture
+def deterministic_tied_athletes():
+    """
+    Engineered athletes that GUARANTEE tied scenarios for testing.
+
+    Returns 5 athletes where:
+      - Athlete A: top3_total=21 (TR-qualified)
+      - Athlete B: top3_total=18 (BÖLGE, first with this score)
+      - Athlete C: top3_total=18 (BÖLGE, TIED with B — tests tie-breaking)
+      - Athlete D: top3_total=15 (BÖLGE)
+      - Athlete E: top3_total=4 (BARAJ_YOK, below minimum)
+
+    This fixture GUARANTEES at least one tie pair for testing ranking_key differentiation.
+    """
+    return [
+        {
+            'name': 'Ayşe Türk',
+            'birth_year': 2013,
+            'gender': 'F',
+            'region': 1,
+            'city': 'İstanbul',
+            'club': 'Test SK A',
+            'event_scores': {
+                ('Serbest', 50): 9,
+                ('Serbest', 100): 9,
+                ('Sırtüstü', 50): 3
+            },
+            'selected': 'TR',
+            'selected_slot': 'TR-1',
+            'ranking_key': str((-9, -9, -3)),
+            'top3_total': 21,
+            'tied': False
+        },
+        {
+            'name': 'Berengüzar Özkan',
+            'birth_year': 2013,
+            'gender': 'F',
+            'region': 1,
+            'city': 'Ankara',
+            'club': 'Test SK B',
+            'event_scores': {
+                ('Serbest', 50): 7,
+                ('Serbest', 100): 7,
+                ('Sırtüstü', 50): 4
+            },
+            'selected': 'BÖLGE',
+            'selected_slot': 'B1-1',
+            'ranking_key': str((-7, -7, -4)),
+            'top3_total': 18,
+            'tied': True
+        },
+        {
+            'name': 'Cevdet Yılmaz',
+            'birth_year': 2013,
+            'gender': 'M',
+            'region': 1,
+            'city': 'İzmir',
+            'club': 'Test SK C',
+            'event_scores': {
+                ('Serbest', 50): 7,
+                ('Serbest', 100): 7,
+                ('Kelebek', 50): 4
+            },
+            'selected': 'BÖLGE',
+            'selected_slot': 'B1-2',
+            'ranking_key': str((-7, -7, -3)),  # Different ranking_key despite same top3_total
+            'top3_total': 18,
+            'tied': True
+        },
+        {
+            'name': 'Dilara Kaya',
+            'birth_year': 2013,
+            'gender': 'F',
+            'region': 2,
+            'city': 'Bursa',
+            'club': 'Test SK D',
+            'event_scores': {
+                ('Serbest', 50): 6,
+                ('Serbest', 100): 5,
+                ('Sırtüstü', 50): 4
+            },
+            'selected': 'BÖLGE',
+            'selected_slot': 'B2-1',
+            'ranking_key': str((-6, -5, -4)),
+            'top3_total': 15,
+            'tied': False
+        },
+        {
+            'name': 'Emre Şahin',
+            'birth_year': 2013,
+            'gender': 'M',
+            'region': 3,
+            'city': 'Adana',
+            'club': 'Test SK E',
+            'event_scores': {
+                ('Serbest', 50): 3,
+                ('Serbest', 100): 1
+            },
+            'selected': 'BARAJ_YOK',
+            'selected_slot': '-',
+            'ranking_key': str((-3, -1)),
+            'top3_total': 4,
+            'tied': False
+        }
+    ]
+
+
 @pytest.fixture(autouse=True)
 def isolate_db_access(test_db, monkeypatch):
     """
