@@ -10,6 +10,10 @@ def test_migrate_adds_selection_columns_to_fed_results():
     conn = get_conn()
     cursor = conn.cursor()
 
+    # Clean up any existing test data first
+    cursor.execute("DELETE FROM fed_results WHERE athlete_name = ?", ('Test Athlete',))
+    conn.commit()
+
     cursor.execute("""
         INSERT INTO fed_results
         (race_leg, athlete_name, birth_year, gender, stroke, distance, points,
@@ -22,6 +26,10 @@ def test_migrate_adds_selection_columns_to_fed_results():
     # Query back
     cursor.execute("SELECT selected, selected_slot, tied, ranking_key FROM fed_results WHERE athlete_name = ?", ('Test Athlete',))
     row = cursor.fetchone()
+
+    # Clean up test data
+    cursor.execute("DELETE FROM fed_results WHERE athlete_name = ?", ('Test Athlete',))
+    conn.commit()
     conn.close()
 
     assert row is not None, "Row not inserted"
