@@ -79,7 +79,7 @@ def migrate_add_selection_columns():
         _add_column_if_missing(conn, "fed_results", "selected", "TEXT DEFAULT '-'")
         _add_column_if_missing(conn, "fed_results", "selected_slot", "TEXT DEFAULT '-'")
         _add_column_if_missing(conn, "fed_results", "tied", "BOOLEAN DEFAULT 0")
-        _add_column_if_missing(conn, "fed_results", "ranking_key", "TEXT")
+        _add_column_if_missing(conn, "fed_results", "ranking_key", "TEXT DEFAULT '-'")
 
         # fed_athlete_best table — add 2 columns
         _add_column_if_missing(conn, "fed_athlete_best", "selected", "TEXT DEFAULT '-'")

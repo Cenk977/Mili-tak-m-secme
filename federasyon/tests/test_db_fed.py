@@ -14,26 +14,28 @@ def test_migrate_adds_selection_columns_to_fed_results():
     cursor.execute("DELETE FROM fed_results WHERE athlete_name = ?", ('Test Athlete',))
     conn.commit()
 
-    cursor.execute("""
-        INSERT INTO fed_results
-        (race_leg, athlete_name, birth_year, gender, stroke, distance, points,
-         selected, selected_slot, tied, ranking_key)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, ('test', 'Test Athlete', 2013, 'M', 'Serbest', 50, 7, 'TR', 'TR-1', 0, '(-7)'))
+    try:
+        cursor.execute("""
+            INSERT INTO fed_results
+            (race_leg, athlete_name, birth_year, gender, stroke, distance, points,
+             selected, selected_slot, tied, ranking_key)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, ('test', 'Test Athlete', 2013, 'M', 'Serbest', 50, 7, 'TR', 'TR-1', 0, '(-7)'))
 
-    conn.commit()
+        conn.commit()
 
-    # Query back
-    cursor.execute("SELECT selected, selected_slot, tied, ranking_key FROM fed_results WHERE athlete_name = ?", ('Test Athlete',))
-    row = cursor.fetchone()
+        # Query back
+        cursor.execute("SELECT selected, selected_slot, tied, ranking_key FROM fed_results WHERE athlete_name = ?", ('Test Athlete',))
+        row = cursor.fetchone()
 
-    # Clean up test data
-    cursor.execute("DELETE FROM fed_results WHERE athlete_name = ?", ('Test Athlete',))
-    conn.commit()
-    conn.close()
+        assert row is not None, "Row not inserted"
+        assert row[0] == 'TR', f"selected column has wrong value: {row[0]}"
+        assert row[1] == 'TR-1', f"selected_slot column has wrong value: {row[1]}"
+        assert row[2] == 0, f"tied column has wrong value: {row[2]}"
+        assert row[3] == '(-7)', f"ranking_key column has wrong value: {row[3]}"
 
-    assert row is not None, "Row not inserted"
-    assert row[0] == 'TR', f"selected column has wrong value: {row[0]}"
-    assert row[1] == 'TR-1', f"selected_slot column has wrong value: {row[1]}"
-    assert row[2] == 0, f"tied column has wrong value: {row[2]}"
-    assert row[3] == '(-7)', f"ranking_key column has wrong value: {row[3]}"
+    finally:
+        # Clean up test data — runs even if assertions fail
+        cursor.execute("DELETE FROM fed_results WHERE athlete_name = ?", ('Test Athlete',))
+        conn.commit()
+        conn.close()
