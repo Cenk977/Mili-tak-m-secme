@@ -492,6 +492,122 @@
             display: block;
             margin-bottom: 5px;
         }
+
+        /* Task 5: Selected Athletes Sections */
+        #selected-athletes-section {
+            display: none;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #ddd;
+        }
+
+        #selected-athletes-section.visible {
+            display: block;
+        }
+
+        .selected-subsection {
+            margin-bottom: 30px;
+        }
+
+        .selected-subsection h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .selected-subsection table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        .selected-subsection thead {
+            background: #f5f5f5;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .selected-subsection th {
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .selected-subsection td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .selected-subsection tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .selected-athletes-empty {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            background: #f9f9f9;
+            border-radius: 6px;
+            font-style: italic;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .summary-table thead {
+            background: #f5f5f5;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .summary-table th {
+            padding: 12px 15px;
+            text-align: center;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .summary-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .summary-table tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .summary-table .birth-year {
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .summary-table .count-tr {
+            background: #fff9e6;
+            color: #f57c00;
+            font-weight: 600;
+        }
+
+        .summary-table .count-bolge {
+            background: #e0f7fa;
+            color: #00838f;
+            font-weight: 600;
+        }
+
+        .summary-table .count-total {
+            background: #f3f3f3;
+            color: #666;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -614,6 +730,68 @@
                     <div id="regional-athletes-container"></div>
                 </div>
             </div>
+
+            <!-- Task 5: Selected Athletes Section -->
+            <div id="selected-athletes-section">
+                <div class="section-title">Seçilmiş Sporcular</div>
+
+                <!-- Türkiye Seçimleri -->
+                <div class="selected-subsection" id="tr-subsection">
+                    <h4>Türkiye Seçimleri</h4>
+                    <table id="table-selected-tr">
+                        <thead>
+                            <tr>
+                                <th>Sporcu</th>
+                                <th>Yaş</th>
+                                <th>Slot</th>
+                                <th>Top 3</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div id="tr-empty" class="selected-athletes-empty" style="display: none;">
+                        Türkiye seçiminde sporcu bulunamadı.
+                    </div>
+                </div>
+
+                <!-- Bölge Seçimleri -->
+                <div class="selected-subsection" id="bolge-subsection">
+                    <h4>Bölge Seçimleri</h4>
+                    <table id="table-selected-bolge">
+                        <thead>
+                            <tr>
+                                <th>Sporcu</th>
+                                <th>Yaş</th>
+                                <th>Slot</th>
+                                <th>Top 3</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div id="bolge-empty" class="selected-athletes-empty" style="display: none;">
+                        Bölge seçiminde sporcu bulunamadı.
+                    </div>
+                </div>
+
+                <!-- Özet Statistikleri -->
+                <div class="selected-subsection" id="summary-subsection">
+                    <h4>Özet</h4>
+                    <div id="summary-content">
+                        <table class="summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Doğum Yılı</th>
+                                    <th>Türkiye</th>
+                                    <th>Bölge</th>
+                                    <th>Toplam</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summary-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -631,6 +809,109 @@
     <script>
         // Leg selection state
         let currentLeg = 'combined';
+
+        // ========== Task 5: Display Selected Athletes Functions ==========
+
+        /**
+         * Display selected athletes from upload response.
+         * Populates TR and BÖLGE tables, and summary statistics.
+         * Handles empty lists gracefully.
+         */
+        function displaySelectedAthletes(data) {
+            if (!data) {
+                console.error('No data provided to displaySelectedAthletes');
+                return;
+            }
+
+            try {
+                const selectedSection = document.getElementById('selected-athletes-section');
+                if (!selectedSection) {
+                    console.error('Selected athletes section not found in DOM');
+                    return;
+                }
+
+                // Get data from response
+                const selectedTr = data.selected_tr || [];
+                const selectedBolge = data.selected_bolge || [];
+                const summary = data.summary || {};
+
+                // Populate TR table
+                const trTbody = document.querySelector('#table-selected-tr tbody');
+                const trEmpty = document.getElementById('tr-empty');
+                if (trTbody) {
+                    trTbody.innerHTML = '';
+                    if (selectedTr.length > 0) {
+                        trEmpty.style.display = 'none';
+                        selectedTr.forEach(athlete => {
+                            const row = document.createElement('tr');
+                            const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
+                            row.innerHTML = `
+                                <td>${athlete.name || '-'}</td>
+                                <td>${age}</td>
+                                <td>${athlete.selected_slot || '-'}</td>
+                                <td>${athlete.top3_total || 0}</td>
+                            `;
+                            trTbody.appendChild(row);
+                        });
+                    } else {
+                        trEmpty.style.display = 'block';
+                    }
+                }
+
+                // Populate BÖLGE table
+                const borgeTbody = document.querySelector('#table-selected-bolge tbody');
+                const bolgeEmpty = document.getElementById('bolge-empty');
+                if (borgeTbody) {
+                    borgeTbody.innerHTML = '';
+                    if (selectedBolge.length > 0) {
+                        bolgeEmpty.style.display = 'none';
+                        selectedBolge.forEach(athlete => {
+                            const row = document.createElement('tr');
+                            const age = athlete.birth_year ? new Date().getFullYear() - athlete.birth_year : '-';
+                            row.innerHTML = `
+                                <td>${athlete.name || '-'}</td>
+                                <td>${age}</td>
+                                <td>${athlete.selected_slot || '-'}</td>
+                                <td>${athlete.top3_total || 0}</td>
+                            `;
+                            borgeTbody.appendChild(row);
+                        });
+                    } else {
+                        bolgeEmpty.style.display = 'block';
+                    }
+                }
+
+                // Populate summary statistics
+                const summaryTbody = document.getElementById('summary-tbody');
+                if (summaryTbody) {
+                    summaryTbody.innerHTML = '';
+
+                    // Sort birth years in descending order
+                    const sortedYears = Object.keys(summary)
+                        .map(y => parseInt(y))
+                        .sort((a, b) => b - a);
+
+                    sortedYears.forEach(birthYear => {
+                        const stats = summary[birthYear];
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="birth-year">${birthYear}</td>
+                            <td class="count-tr">${stats.tr || 0}</td>
+                            <td class="count-bolge">${stats.bolge || 0}</td>
+                            <td class="count-total">${stats.total || 0}</td>
+                        `;
+                        summaryTbody.appendChild(row);
+                    });
+                }
+
+                // Show the section
+                selectedSection.classList.add('visible');
+
+                console.log('Selected athletes display populated successfully');
+            } catch (error) {
+                console.error('Error displaying selected athletes:', error);
+            }
+        }
 
         // Upload handling
         const uploadArea = document.getElementById('uploadArea');
@@ -676,16 +957,25 @@
             })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'success') {
-                    uploadStatus.classList.remove('loading');
+                uploadStatus.classList.remove('loading');
+
+                // Check for success using either 'status' or 'success' field
+                const isSuccess = data.status === 'success' || data.success === true;
+
+                if (isSuccess) {
                     uploadStatus.classList.add('success');
-                    uploadStatus.textContent = `✓ Başarılı! ${data.count} sporcu yüklendi`;
+                    uploadStatus.textContent = `✓ Başarılı! ${data.total_athletes || data.count || 0} sporcu yüklendi`;
                     fileInput.value = '';
+
+                    // Display selected athletes if data is available
+                    if (data.selected_tr || data.selected_bolge) {
+                        displaySelectedAthletes(data);
+                    }
+
                     setTimeout(() => loadRankings(), 1000);
                 } else {
-                    uploadStatus.classList.remove('loading');
                     uploadStatus.classList.add('error');
-                    uploadStatus.textContent = `✗ Hata: ${data.message}`;
+                    uploadStatus.textContent = `✗ Hata: ${data.message || data.error || 'Bilinmeyen hata'}`;
                 }
             })
             .catch(error => {
