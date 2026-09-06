@@ -263,19 +263,22 @@ class TestTRQuotaEnforcement:
 
         assert result['success'] is True
 
-        # Group TR athletes by birth year
-        tr_by_birth_year = {}
+        # Quotas apply per (birth_year, gender) group — the same key rank_all()
+        # uses to build its selection groups.
+        tr_by_group = {}
         for athlete in result['selected_tr']:
-            by = athlete['birth_year']
-            tr_by_birth_year.setdefault(by, []).append(athlete)
+            key = (athlete['birth_year'], athlete['gender'])
+            tr_by_group.setdefault(key, []).append(athlete)
 
-        # Check quota for each birth year
-        for by, athletes_list in tr_by_birth_year.items():
+        for (by, gender), athletes_list in tr_by_group.items():
             quota = SELECTION_QUOTAS.get(by, {}).get('tr', 0)
             count = len(athletes_list)
+            # Athletes tied with the last in-quota athlete are kept by design
+            tied_extra = sum(1 for a in athletes_list if a.get('tied'))
 
-            assert count <= quota, \
-                f"TR quota violated for {by}: {count} selected > {quota} quota"
+            assert count <= quota + tied_extra, \
+                f"TR quota violated for {by}/{gender}: {count} selected > {quota} quota " \
+                f"(tied={tied_extra})"
 
     def test_tr_quota_validation_in_pipeline(self, sample_athletes_data):
         """
@@ -344,36 +347,23 @@ class TestBölgeQuotaPerRegion:
 
         assert result['success'] is True
 
-        # Group BÖLGE athletes by birth_year and region
-        bolge_by_year_region = {}
+        # Region quotas apply per (birth_year, gender, region) — rank_all()
+        # splits athletes by birth_year AND gender before applying region quotas.
+        bolge_by_group = {}
         for athlete in result['selected_bolge']:
-            by = athlete['birth_year']
-            region = athlete.get('region')
+            key = (athlete['birth_year'], athlete['gender'], athlete.get('region'))
+            bolge_by_group.setdefault(key, []).append(athlete)
 
-            if by not in bolge_by_year_region:
-                bolge_by_year_region[by] = {}
-            if region not in bolge_by_year_region[by]:
-                bolge_by_year_region[by][region] = []
-
-            bolge_by_year_region[by][region].append(athlete)
-
-        # Verify quotas (check against expected regional limits)
-        for by, regions_dict in bolge_by_year_region.items():
+        for (by, gender, region), athletes_list in bolge_by_group.items():
             quota = SELECTION_QUOTAS.get(by, {})
-            region_1_limit = quota.get('region_1', 3)
-            region_other_limit = quota.get('region_other', 2)
+            limit = quota.get('region_1', 3) if region == 1 else quota.get('region_other', 2)
+            count = len(athletes_list)
+            # Athletes tied at the quota boundary are kept by design
+            tied_extra = sum(1 for a in athletes_list if a.get('tied'))
 
-            for region, athletes_list in regions_dict.items():
-                count = len(athletes_list)
-
-                if region == 1:
-                    limit = region_1_limit
-                    assert count <= limit, \
-                        f"BÖLGE quota exceeded for {by}/Region 1: {count} > {limit}"
-                else:
-                    limit = region_other_limit
-                    assert count <= limit, \
-                        f"BÖLGE quota exceeded for {by}/Region {region}: {count} > {limit}"
+            assert count <= limit + tied_extra, \
+                f"BÖLGE quota exceeded for {by}/{gender}/Region {region}: " \
+                f"{count} > {limit} (tied={tied_extra})"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

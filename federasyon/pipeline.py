@@ -16,7 +16,13 @@ from pathlib import Path
 from typing import Tuple, List, Dict, Any
 
 from modules.lxf_parser import parse_lxf_file as parse, get_birth_year
-from federasyon.scorer import score_athlete_row, best_scores_sequence, compute_ranking_key
+from federasyon.scorer import (
+    score_athlete_row,
+    score_event,
+    parse_time,
+    best_scores_sequence,
+    compute_ranking_key,
+)
 from federasyon.ranker import rank_all
 from federasyon.db_fed import (
     upsert_fed_results,
@@ -27,6 +33,22 @@ from federasyon.db_fed import (
 from federasyon.scoring_tables import SELECTION_QUOTAS
 
 logger = logging.getLogger(__name__)
+
+_SCHEMA_READY = False
+
+
+def ensure_schema():
+    """
+    Run the fed_* schema migration once per process.
+
+    The server calls migrate_add_selection_columns() at startup; this guard
+    keeps stand-alone/library use (and tests) working without re-running the
+    migration on every pipeline instantiation.
+    """
+    global _SCHEMA_READY
+    if not _SCHEMA_READY:
+        migrate_add_selection_columns()
+        _SCHEMA_READY = True
 
 
 class MiltiTakimPipeline:
@@ -42,8 +64,7 @@ class MiltiTakimPipeline:
     """
 
     def __init__(self):
-        """Initialize the pipeline."""
-        migrate_add_selection_columns()
+        """Initialize the pipeline (schema migration happens lazily in process())."""
         logger.info("MiltiTakimPipeline initialized")
 
     def process(self, lxf_path: str) -> Dict[str, Any]:
@@ -64,20 +85,27 @@ class MiltiTakimPipeline:
               - summary: dict  # {birth_year: {tr, bolge, total}, ...}
         """
         try:
+            ensure_schema()
+
             # Step 1: Parse LXF
             logger.info(f"Parsing LXF: {lxf_path}")
             athletes, results = self.parse_and_extract(lxf_path)
-            logger.info(f"Parsed {len(athletes)} athletes")
+            logger.info(f"Parsed {len(athletes)} athletes, {len(results)} results")
 
-            # Step 2: Score athletes
+            # Step 2: Score athletes — event_scores are built from the parsed
+            # swim results, NOT from Excel-style columns on the athlete dict.
             logger.info("Scoring athletes...")
-            athletes = self.score_athletes(athletes)
-            logger.info(f"Scored athletes")
+            athletes = self.score_athletes(athletes, results)
+            scored_count = sum(1 for a in athletes if a.get('event_scores'))
+            logger.info(f"Scored {scored_count}/{len(athletes)} athletes")
 
             # Step 3: Rank athletes
             logger.info("Ranking athletes...")
             ranked = self.rank_athletes(athletes)
             logger.info(f"Ranked {len(ranked)} athletes")
+
+            # Step 3b: Validate quota enforcement at runtime
+            self.validate_results(ranked)
 
             # Step 4: Save to database
             logger.info("Saving to database...")
@@ -143,37 +171,109 @@ class MiltiTakimPipeline:
             logger.error(f"Parse error: {e}")
             raise
 
-    def score_athletes(self, athletes: List[Dict]) -> List[Dict]:
+    @staticmethod
+    def _index_results(results: List[Dict]) -> Dict[str, List[Dict]]:
+        """Group parsed LXF results by athlete_id."""
+        by_athlete: Dict[str, List[Dict]] = {}
+        for result in results or []:
+            athlete_id = result.get('athlete_id')
+            if athlete_id is None:
+                continue
+            by_athlete.setdefault(str(athlete_id), []).append(result)
+        return by_athlete
+
+    @staticmethod
+    def _score_from_results(athlete_results: List[Dict], birth_year: int,
+                            gender: str) -> Tuple[Dict[tuple, int], Dict[tuple, Dict]]:
+        """
+        Map a list of LXF result dicts → ({(stroke, distance): points},
+                                          {(stroke, distance): {time_seconds, time_text}}).
+
+        Only positive scores are kept. If the same event appears more than once
+        (heat + final), the best (highest) score / fastest time wins.
+        """
+        event_scores: Dict[tuple, int] = {}
+        event_times: Dict[tuple, Dict] = {}
+
+        for result in athlete_results:
+            stroke = result.get('stroke')
+            raw_distance = result.get('distance')
+            if not stroke or raw_distance in (None, ''):
+                continue
+            try:
+                distance = int(raw_distance)
+            except (TypeError, ValueError):
+                continue
+
+            time_seconds = result.get('time_seconds')
+            if time_seconds is None:
+                time_seconds = parse_time(result.get('time_text'))
+            if time_seconds is None or time_seconds <= 0:
+                continue
+
+            event = (stroke, distance)
+            points = score_event(time_seconds, birth_year, gender, stroke, distance)
+
+            prev_time = event_times.get(event, {}).get('time_seconds')
+            if prev_time is None or time_seconds < prev_time:
+                event_times[event] = {
+                    'time_seconds': time_seconds,
+                    'time_text': result.get('time_text'),
+                }
+
+            if points > 0 and points > event_scores.get(event, 0):
+                event_scores[event] = points
+
+        return event_scores, event_times
+
+    def score_athletes(self, athletes: List[Dict],
+                       results: List[Dict] = None) -> List[Dict]:
         """
         Score each athlete's events using birth_year and gender.
 
+        The primary source of truth is the parsed `results` list (swim times),
+        keyed to athletes by athlete_id. Excel-style columns on the athlete dict
+        (Serbest_50m, ...) are only used as a fallback when no results exist for
+        that athlete — this keeps spreadsheet-sourced input working.
+
         Args:
             athletes: List of athlete dicts
+            results:  List of parsed result dicts from the LXF parser
 
         Returns:
-            Same list, with 'event_scores' added to each athlete
+            Same list, with 'event_scores' / 'event_times' / 'top3_total' added
         """
+        results_by_athlete = self._index_results(results)
+
         for athlete in athletes:
             birth_year = athlete.get('birth_year')
             gender = athlete.get('gender', '')
+            athlete.setdefault('event_times', {})
 
             if not birth_year:
                 logger.warning(f"Athlete {athlete.get('name')} missing birth_year, skipping scoring")
                 athlete['event_scores'] = {}
+                athlete['top3_total'] = 0
                 continue
 
+            athlete_results = results_by_athlete.get(str(athlete.get('athlete_id')), [])
+
             try:
-                # score_athlete_row expects Excel column names (Serbest_50m, etc.)
-                event_scores = score_athlete_row(athlete, birth_year, gender)
-                athlete['event_scores'] = event_scores
-
-                if event_scores:
-                    top3 = sum(best_scores_sequence(event_scores)[:3])
-                    athlete['top3_total'] = top3
+                if athlete_results:
+                    event_scores, event_times = self._score_from_results(
+                        athlete_results, birth_year, gender
+                    )
+                    athlete['event_times'] = event_times
                 else:
-                    athlete['top3_total'] = 0
+                    # Fallback: Excel-style columns (Serbest_50m, ...)
+                    event_scores = score_athlete_row(athlete, birth_year, gender)
 
-            except Exception as e:
+                athlete['event_scores'] = event_scores
+                athlete['top3_total'] = (
+                    sum(best_scores_sequence(event_scores)[:3]) if event_scores else 0
+                )
+
+            except (KeyError, TypeError, ValueError) as e:
                 logger.warning(f"Scoring error for {athlete.get('name')}: {e}")
                 athlete['event_scores'] = {}
                 athlete['top3_total'] = 0
@@ -279,6 +379,7 @@ class MiltiTakimPipeline:
                     'gender': athlete.get('gender', ''),
                     'selected_slot': athlete.get('selected_slot', ''),
                     'top3_total': athlete.get('top3_total', 0),
+                    'tied': bool(athlete.get('tied', False)),
                     'region': athlete.get('region'),
                     'city': athlete.get('city', ''),
                     'club': athlete.get('club', '')
@@ -293,6 +394,7 @@ class MiltiTakimPipeline:
                     'gender': athlete.get('gender', ''),
                     'selected_slot': athlete.get('selected_slot', ''),
                     'top3_total': athlete.get('top3_total', 0),
+                    'tied': bool(athlete.get('tied', False)),
                     'region': athlete.get('region'),
                     'city': athlete.get('city', ''),
                     'club': athlete.get('club', '')
@@ -325,20 +427,25 @@ class MiltiTakimPipeline:
         Returns:
             True if valid, raises Exception otherwise
         """
-        # Group by birth_year
-        by_birth_year = {}
+        # Group by (birth_year, gender) — the ranker applies quotas per
+        # birth-year AND gender group, so validation must use the same key.
+        by_group = {}
         for athlete in athletes:
-            by = athlete.get('birth_year')
-            by_birth_year.setdefault(by, []).append(athlete)
+            key = (athlete.get('birth_year'), athlete.get('gender'))
+            by_group.setdefault(key, []).append(athlete)
 
-        # Check TR quotas
-        for by, athletes_list in by_birth_year.items():
+        # Check TR quotas (ties at the quota boundary may legitimately add rows)
+        for (by, gender), athletes_list in by_group.items():
             tr_selected = [a for a in athletes_list if a.get('selected') == 'TR']
 
             if by in SELECTION_QUOTAS:
                 quota = SELECTION_QUOTAS[by]['tr']
-                if len(tr_selected) > quota:
-                    raise Exception(f"TR quota exceeded for {by}: {len(tr_selected)} > {quota}")
+                tied_extra = sum(1 for a in tr_selected if a.get('tied'))
+                if len(tr_selected) > quota + tied_extra:
+                    raise Exception(
+                        f"TR quota exceeded for {by}/{gender}: "
+                        f"{len(tr_selected)} > {quota}"
+                    )
 
         # Check selection status validity
         valid_statuses = {'-', 'TR', 'BÖLGE', 'BARAJ_YOK', 'MULTINATIONS'}

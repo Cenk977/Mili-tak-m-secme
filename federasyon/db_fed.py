@@ -81,9 +81,11 @@ def migrate_add_selection_columns():
         _add_column_if_missing(conn, "fed_results", "tied", "BOOLEAN DEFAULT 0")
         _add_column_if_missing(conn, "fed_results", "ranking_key", "TEXT DEFAULT '-'")
 
-        # fed_athlete_best table — add 2 columns
+        # fed_athlete_best table — mirror the selection/ranking fields
         _add_column_if_missing(conn, "fed_athlete_best", "selected", "TEXT DEFAULT '-'")
         _add_column_if_missing(conn, "fed_athlete_best", "selected_slot", "TEXT DEFAULT '-'")
+        _add_column_if_missing(conn, "fed_athlete_best", "tied", "BOOLEAN DEFAULT 0")
+        _add_column_if_missing(conn, "fed_athlete_best", "ranking_key", "TEXT DEFAULT '-'")
 
         conn.commit()
     finally:
@@ -103,28 +105,60 @@ def upsert_fed_results(athlete: dict, race_leg: str = 'milli_takim'):
     cursor = conn.cursor()
 
     try:
-        name = athlete.get('name', '')
         birth_year = athlete.get('birth_year')
+        name = _canonical_name(conn, athlete.get('name', ''), birth_year)
         gender = athlete.get('gender', '')
         region = athlete.get('region')
         city = athlete.get('city', '')
         club = athlete.get('club', '')
         event_scores = athlete.get('event_scores', {})
+        event_times = athlete.get('event_times', {}) or {}
+        race_date = athlete.get('race_date')
         selected = athlete.get('selected', '-')
         selected_slot = athlete.get('selected_slot', '-')
         tied = 1 if athlete.get('tied', False) else 0
-        ranking_key = athlete.get('ranking_key', '')
+        ranking_key = str(athlete.get('ranking_key', ''))
 
         for (stroke, distance), points in event_scores.items():
-            cursor.execute("""
-                INSERT OR REPLACE INTO fed_results
-                (race_leg, race_date, athlete_name, birth_year, gender, region, city, club,
-                 stroke, distance, points, selected, selected_slot, tied, ranking_key)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                race_leg, None, name, birth_year, gender, region, city, club,
-                stroke, distance, points, selected, selected_slot, tied, ranking_key
-            ))
+            timing = event_times.get((stroke, distance), {})
+            time_seconds = timing.get('time_seconds')
+            time_text = timing.get('time_text')
+
+            # INSERT OR REPLACE would wipe time columns when the caller has no
+            # timing data; upsert on the unique key instead so times survive.
+            existing = cursor.execute(
+                "SELECT id, time_seconds, time_text, race_date FROM fed_results "
+                "WHERE race_leg=? AND athlete_name=? AND birth_year=? "
+                "AND stroke=? AND distance=?",
+                (race_leg, name, birth_year, stroke, distance)
+            ).fetchone()
+
+            if existing:
+                cursor.execute("""
+                    UPDATE fed_results
+                    SET gender=?, region=?, city=?, club=?, points=?,
+                        time_seconds=COALESCE(?, time_seconds),
+                        time_text=COALESCE(?, time_text),
+                        race_date=COALESCE(?, race_date),
+                        selected=?, selected_slot=?, tied=?, ranking_key=?
+                    WHERE id=?
+                """, (
+                    gender, region, city, club, points,
+                    time_seconds, time_text, race_date,
+                    selected, selected_slot, tied, ranking_key, existing["id"]
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO fed_results
+                    (race_leg, race_date, athlete_name, birth_year, gender, region, city, club,
+                     stroke, distance, time_text, time_seconds, points,
+                     selected, selected_slot, tied, ranking_key)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    race_leg, race_date, name, birth_year, gender, region, city, club,
+                    stroke, distance, time_text, time_seconds, points,
+                    selected, selected_slot, tied, ranking_key
+                ))
 
         conn.commit()
     finally:
@@ -141,48 +175,55 @@ def update_athlete_selection(athlete: dict):
     cursor = conn.cursor()
 
     try:
-        name = athlete.get('name', '')
         birth_year = athlete.get('birth_year')
+        # Use the same canonical spelling that fed_results stores (i/ı tolerant)
+        name = _canonical_name(conn, athlete.get('name', ''), birth_year)
         gender = athlete.get('gender', '')
         region = athlete.get('region')
         city = athlete.get('city', '')
         club = athlete.get('club', '')
         selected = athlete.get('selected', '-')
         selected_slot = athlete.get('selected_slot', '-')
+        tied = 1 if athlete.get('tied', False) else 0
+        ranking_key = str(athlete.get('ranking_key', '') or '-')
 
-        # Ensure athlete exists in fed_athlete_best (insert if missing)
-        # First check if athlete exists for this birth_year
+        # Ensure athlete exists in fed_athlete_best (insert if missing).
+        # Key on (name, birth_year, gender) — name+birth_year alone can collide
+        # between a male and a female athlete sharing a name.
         existing = cursor.execute(
-            "SELECT COUNT(*) FROM fed_athlete_best WHERE athlete_name = ? AND birth_year = ?",
-            (name, birth_year)
+            "SELECT COUNT(*) FROM fed_athlete_best "
+            "WHERE athlete_name = ? AND birth_year = ? AND gender = ?",
+            (name, birth_year, gender)
         ).fetchone()
 
         if existing and existing[0] == 0:
             # Athlete not in fed_athlete_best, populate from fed_results
-            # Get all unique events for this athlete
             events = cursor.execute("""
-                SELECT DISTINCT stroke, distance, points, gender, region, city, club
+                SELECT DISTINCT stroke, distance, points, gender, region, city, club,
+                       time_seconds, time_text, race_leg
                 FROM fed_results
-                WHERE athlete_name = ? AND birth_year = ?
+                WHERE athlete_name = ? AND birth_year = ? AND gender = ?
                 ORDER BY stroke, distance
-            """, (name, birth_year)).fetchall()
+            """, (name, birth_year, gender)).fetchall()
 
             for event in events:
-                stroke, distance, points, g, r, c, cl = event
+                stroke, distance, points, g, r, c, cl, tsec, ttxt, leg = event
                 cursor.execute("""
                     INSERT OR IGNORE INTO fed_athlete_best
                     (athlete_name, birth_year, gender, region, city, club,
-                     stroke, distance, best_points, selected, selected_slot)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     stroke, distance, best_points, best_time_sec, best_time_txt,
+                     best_leg, selected, selected_slot, tied, ranking_key)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (name, birth_year, g or gender, r or region, c or city, cl or club,
-                      stroke, distance, points or 0, selected, selected_slot))
+                      stroke, distance, points or 0, tsec, ttxt, leg,
+                      selected, selected_slot, tied, ranking_key))
 
         # Now update all rows for this athlete with selection info
         cursor.execute("""
             UPDATE fed_athlete_best
-            SET selected = ?, selected_slot = ?
-            WHERE athlete_name = ? AND birth_year = ?
-        """, (selected, selected_slot, name, birth_year))
+            SET selected = ?, selected_slot = ?, tied = ?, ranking_key = ?
+            WHERE athlete_name = ? AND birth_year = ? AND gender = ?
+        """, (selected, selected_slot, tied, ranking_key, name, birth_year, gender))
 
         conn.commit()
     finally:

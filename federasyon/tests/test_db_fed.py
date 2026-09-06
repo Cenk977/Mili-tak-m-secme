@@ -152,12 +152,18 @@ def test_get_selected_athletes_filters_by_birth_year_and_status():
         upsert_fed_results(athlete, race_leg='milli_takim')
         update_athlete_selection(athlete)
 
+    # The database is shared with real pipeline data, so count only the
+    # athletes this test inserted.
+    own_names = {f'Athlete {i}' for i in range(3)}
+
     # Query TR only
-    tr_selected = get_selected_athletes(birth_year=2013, selected='TR')
+    tr_selected = [a for a in get_selected_athletes(birth_year=2013, selected='TR')
+                   if a['name'] in own_names]
     assert len(tr_selected) == 2, f"Expected 2 TR, got {len(tr_selected)}"
 
     # Query BÖLGE only
-    bolge_selected = get_selected_athletes(birth_year=2013, selected='BÖLGE')
+    bolge_selected = [a for a in get_selected_athletes(birth_year=2013, selected='BÖLGE')
+                      if a['name'] in own_names]
     assert len(bolge_selected) == 1, f"Expected 1 BÖLGE, got {len(bolge_selected)}"
 
     # Cleanup

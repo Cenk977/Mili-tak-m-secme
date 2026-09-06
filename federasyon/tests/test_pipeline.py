@@ -16,6 +16,16 @@ from federasyon.db_fed import get_conn, migrate_add_selection_columns
 from federasyon.scoring_tables import SELECTION_QUOTAS
 
 
+TEST_LXF = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+
+
+@pytest.fixture(scope="module")
+def real_result():
+    """Run the full pipeline once on the real Antalya LXF and share the result."""
+    assert TEST_LXF.exists(), f"Test fixture missing: {TEST_LXF}"
+    return MiltiTakimPipeline().process(str(TEST_LXF))
+
+
 class TestMiltiTakimPipelineInitialization:
     """Test pipeline initialization"""
 
@@ -29,91 +39,50 @@ class TestMiltiTakimPipelineInitialization:
 class TestMiltiTakimPipelineProcess:
     """Test the main process() method"""
 
-    def test_process_returns_dict_with_required_keys(self):
+    def test_process_returns_dict_with_required_keys(self, real_result):
         """process() returns dict with success, message, selected_tr, selected_bolge, etc."""
-        pipeline = MiltiTakimPipeline()
+        for key in ('success', 'message', 'selected_tr', 'selected_bolge',
+                    'baraj_yok_count', 'total_athletes', 'summary'):
+            assert key in real_result
 
-        # Use real test data
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
-
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
-
-            assert isinstance(result, dict)
-            assert 'success' in result
-            assert 'message' in result
-            assert 'selected_tr' in result
-            assert 'selected_bolge' in result
-            assert 'baraj_yok_count' in result
-            assert 'total_athletes' in result
-            assert 'summary' in result
-
-    def test_process_success_flag_true_on_valid_lxf(self):
+    def test_process_success_flag_true_on_valid_lxf(self, real_result):
         """process() sets success=True on valid LXF"""
-        pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+        assert real_result['success'] is True
 
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
-            assert result['success'] is True
-
-    def test_process_returns_athletes_with_correct_structure(self):
+    def test_process_returns_athletes_with_correct_structure(self, real_result):
         """process() returns selected_tr/selected_bolge with name, birth_year, selected_slot"""
-        pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+        selected_tr = real_result['selected_tr']
+        selected_bolge = real_result['selected_bolge']
 
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
+        assert len(selected_tr) > 0
+        assert len(selected_bolge) > 0
 
-            selected_tr = result['selected_tr']
-            selected_bolge = result['selected_bolge']
+        for athlete in selected_tr:
+            assert 'name' in athlete
+            assert 'birth_year' in athlete
+            assert athlete['selected_slot'].startswith('TR-')
 
-            # Check TR athletes have required fields
-            for athlete in selected_tr:
-                assert 'name' in athlete
-                assert 'birth_year' in athlete
-                assert 'selected_slot' in athlete
-                assert athlete['selected_slot'].startswith('TR-')
+        for athlete in selected_bolge:
+            assert 'name' in athlete
+            assert 'birth_year' in athlete
+            assert athlete['selected_slot'].startswith('B')
 
-            # Check BÖLGE athletes have required fields
-            for athlete in selected_bolge:
-                assert 'name' in athlete
-                assert 'birth_year' in athlete
-                assert 'selected_slot' in athlete
-                assert athlete['selected_slot'].startswith('B')
-
-    def test_process_total_athletes_count_matches(self):
+    def test_process_total_athletes_count_matches(self, real_result):
         """process() total_athletes count is positive"""
-        pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+        assert real_result['total_athletes'] > 0
 
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
-            assert result['total_athletes'] > 0
-
-    def test_process_summary_groups_by_birth_year(self):
+    def test_process_summary_groups_by_birth_year(self, real_result):
         """process() summary dict groups results by birth_year"""
-        pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+        summary = real_result['summary']
 
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
-            summary = result['summary']
+        assert summary
+        for birth_year, stats in summary.items():
+            assert isinstance(birth_year, (int, str))
+            assert 'tr' in stats or 'total' in stats
 
-            # Summary should have birth years as keys
-            if summary:
-                for birth_year, stats in summary.items():
-                    assert isinstance(birth_year, (int, str))
-                    assert 'tr' in stats or 'total' in stats
-
-    def test_process_baraj_yok_count_is_non_negative(self):
+    def test_process_baraj_yok_count_is_non_negative(self, real_result):
         """process() baraj_yok_count is >= 0"""
-        pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
-
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
-            assert result['baraj_yok_count'] >= 0
+        assert real_result['baraj_yok_count'] >= 0
 
 
 class TestMiltiTakimPipelineParsing:
@@ -270,26 +239,24 @@ class TestMiltiTakimPipelineDatabase:
 class TestMiltiTakimPipelineQuotaEnforcement:
     """Test that TR/BÖLGE quotas are respected"""
 
-    def test_tr_quota_not_exceeded(self):
-        """TR selections do not exceed SELECTION_QUOTAS['tr']"""
-        pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+    def test_tr_quota_not_exceeded(self, real_result):
+        """TR selections do not exceed SELECTION_QUOTAS['tr'] per birth_year+gender"""
+        selected_tr = real_result['selected_tr']
+        assert len(selected_tr) > 0
 
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
+        # Quotas apply per (birth_year, gender) group — same key the ranker uses
+        by_group = {}
+        for athlete in selected_tr:
+            by_group.setdefault((athlete['birth_year'], athlete['gender']), []).append(athlete)
 
-            selected_tr = result['selected_tr']
-
-            # Group by birth_year and check quota
-            by_birth_year = {}
-            for athlete in selected_tr:
-                by = athlete['birth_year']
-                by_birth_year.setdefault(by, []).append(athlete)
-
-            for by, athletes_list in by_birth_year.items():
-                quota = SELECTION_QUOTAS.get(by, {}).get('tr', 0)
-                assert len(athletes_list) <= quota, \
-                    f"TR quota exceeded for {by}: {len(athletes_list)} > {quota}"
+        for (by, gender), athletes_list in by_group.items():
+            quota = SELECTION_QUOTAS.get(by, {}).get('tr', 0)
+            # The ranker deliberately keeps every athlete tied with the last
+            # in-quota athlete, so overflow is allowed only for tied athletes.
+            tied_extra = sum(1 for a in athletes_list if a.get('tied'))
+            assert len(athletes_list) <= quota + tied_extra, \
+                f"TR quota exceeded for {by}/{gender}: {len(athletes_list)} > {quota} " \
+                f"(tied={tied_extra})"
 
     def test_no_athletes_selected_without_scores(self):
         """Athletes with no scored events are not selected"""
@@ -343,51 +310,74 @@ class TestMiltiTakimPipelineErrorHandling:
 class TestMiltiTakimPipelineIntegration:
     """Integration tests with real data"""
 
-    def test_full_pipeline_with_real_lxf(self):
+    def test_full_pipeline_with_real_lxf(self, real_result):
         """Full pipeline with real Antalya LXF file"""
+        assert real_result['success'] is True
+        assert isinstance(real_result['selected_tr'], list)
+        assert isinstance(real_result['selected_bolge'], list)
+        assert real_result['total_athletes'] > 0
+        assert isinstance(real_result['summary'], dict)
+
+    def test_lxf_data_flows_through_pipeline(self, real_result):
+        """
+        Regression: the parse→score seam must actually carry swim times.
+
+        Before the fix, score_athletes() looked for Excel columns on the athlete
+        dict and produced event_scores={} for every athlete, so nothing was ever
+        selected or written to the database while success stayed True.
+        """
+        assert real_result['success'] is True
+
+        total_selected = len(real_result['selected_tr']) + len(real_result['selected_bolge'])
+        assert total_selected > 0, "Zero athletes selected from real LXF"
+
+        assert real_result['baraj_yok_count'] < real_result['total_athletes'], \
+            "All athletes below threshold — parse→score seam is broken"
+
+        # The database must actually have been written
+        from federasyon.db_fed import get_selected_athletes
+        assert len(get_selected_athletes(selected='TR')) > 0, \
+            "Zero TR rows in fed_athlete_best"
+
+    def test_scoring_uses_parsed_results_not_excel_columns(self):
+        """score_athletes() builds event_scores from the results list"""
         pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+        athletes, results = pipeline.parse_and_extract(str(TEST_LXF))
 
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
+        assert len(athletes) > 0
+        assert len(results) > 0
 
-            # Validate complete response
-            assert result['success'] is True
-            assert isinstance(result['selected_tr'], list)
-            assert isinstance(result['selected_bolge'], list)
-            assert result['total_athletes'] > 0
-            assert isinstance(result['summary'], dict)
+        scored = pipeline.score_athletes(athletes, results)
+        with_scores = [a for a in scored if a.get('event_scores')]
+
+        assert len(with_scores) > 0, "No athlete received any event score"
+        # Times must be carried through for database persistence
+        assert any(a.get('event_times') for a in with_scores)
+        for athlete in with_scores:
+            assert athlete['top3_total'] > 0
 
     def test_pipeline_produces_reproducible_results(self):
         """Running pipeline twice on same LXF produces consistent results"""
         pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+        result1 = pipeline.process(str(TEST_LXF))
+        result2 = pipeline.process(str(TEST_LXF))
 
-        if test_lxf.exists():
-            result1 = pipeline.process(str(test_lxf))
-            result2 = pipeline.process(str(test_lxf))
-
-            # Same number of athletes selected
-            assert len(result1['selected_tr']) == len(result2['selected_tr'])
-            assert len(result1['selected_bolge']) == len(result2['selected_bolge'])
+        assert len(result1['selected_tr']) == len(result2['selected_tr'])
+        assert len(result1['selected_bolge']) == len(result2['selected_bolge'])
+        assert len(result1['selected_tr']) > 0
 
 
 class TestMiltiTakimPipelineValidation:
     """Test validation of pipeline results"""
 
-    def test_validate_results_passes_valid_output(self):
+    def test_validate_results_passes_valid_output(self, real_result):
         """validate_results() accepts valid pipeline output"""
         pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
 
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
+        all_selected = real_result['selected_tr'] + real_result['selected_bolge']
+        assert len(all_selected) > 0
 
-            # Combine all selected athletes
-            all_selected = result['selected_tr'] + result['selected_bolge']
-
-            # Should be able to validate
-            assert pipeline.validate_results(all_selected) is True
+        assert pipeline.validate_results(all_selected) is True
 
 
 class TestMiltiTakimPipelineCoverage:
@@ -674,19 +664,16 @@ class TestMiltiTakimPipelineDetailedCoverage:
             assert 'name' in athletes[0]
             # club should be missing or default
 
-    def test_process_with_real_data_produces_all_categories(self):
+    def test_process_with_real_data_produces_all_categories(self, real_result):
         """process with real data produces TR, BÖLGE, and BARAJ_YOK selections"""
-        pipeline = MiltiTakimPipeline()
-        test_lxf = Path(__file__).parent.parent.parent / "data" / "antalya_millitakim_secme_sonuc.lxf"
+        assert real_result['success'] is True
+        assert len(real_result['selected_tr']) > 0
+        assert len(real_result['selected_bolge']) > 0
+        assert real_result['baraj_yok_count'] > 0
 
-        if test_lxf.exists():
-            result = pipeline.process(str(test_lxf))
-
-            assert result['success'] is True
-            # Real data should have at least one of each or be reasonable
-            total_selected = len(result['selected_tr']) + len(result['selected_bolge'])
-            assert total_selected + result['baraj_yok_count'] == result['total_athletes'] or \
-                   total_selected + result['baraj_yok_count'] <= result['total_athletes']  # Some may have no scores
+        total_selected = len(real_result['selected_tr']) + len(real_result['selected_bolge'])
+        # Some athletes score nothing at all and stay unselected
+        assert total_selected + real_result['baraj_yok_count'] <= real_result['total_athletes']
 
     def test_score_athletes_preserves_athlete_metadata(self):
         """score_athletes preserves other athlete fields while scoring"""
@@ -756,7 +743,7 @@ class TestMiltiTakimPipelineDetailedCoverage:
         pipeline = MiltiTakimPipeline()
 
         with patch('federasyon.pipeline.score_athlete_row') as mock_score:
-            mock_score.side_effect = Exception("Scoring error")
+            mock_score.side_effect = ValueError("Scoring error")
 
             athletes = [
                 {
