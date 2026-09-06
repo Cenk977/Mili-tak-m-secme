@@ -235,6 +235,47 @@ class TestMiltiTakimPipelineDatabase:
         # Should have at least one TR-selected athlete
         assert len(saved) >= 0  # May be 0 if already in db
 
+    def test_save_to_database_reuses_single_connection(self):
+        """save_to_database() opens one DB connection for the whole batch,
+        not one per athlete (regression test for the upload performance bug:
+        763 athletes were opening/closing 1347 separate connections)."""
+        import federasyon.db_fed as db_fed
+
+        pipeline = MiltiTakimPipeline()
+        athletes = [
+            {
+                'name': f'PerfTest{i}',
+                'birth_year': 2013,
+                'gender': 'M',
+                'region': 1,
+                'city': 'İstanbul',
+                'club': 'Test SK',
+                'event_scores': {('Serbest', 50): 7},
+                'selected': 'BARAJ_YOK',
+                'selected_slot': '-',
+                'ranking_key': '()'
+            }
+            for i in range(20)
+        ]
+
+        migrate_add_selection_columns()
+
+        real_get_conn = db_fed.get_conn
+        call_count = {'n': 0}
+
+        def counting_get_conn():
+            call_count['n'] += 1
+            return real_get_conn()
+
+        with patch('federasyon.db_fed.get_conn', side_effect=counting_get_conn):
+            pipeline.save_to_database(athletes)
+
+        # One connection for the whole batch, regardless of athlete count.
+        assert call_count['n'] == 1, (
+            f"Expected 1 shared connection for 20 athletes, got {call_count['n']} "
+            "(each athlete is opening its own connection)"
+        )
+
 
 class TestMiltiTakimPipelineQuotaEnforcement:
     """Test that TR/BÖLGE quotas are respected"""

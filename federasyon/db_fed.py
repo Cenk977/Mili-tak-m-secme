@@ -96,12 +96,19 @@ def migrate_add_selection_columns():
 # CRUD for athlete selection
 # ─────────────────────────────────────────────────────────────────────────────
 
-def upsert_fed_results(athlete: dict, race_leg: str = 'milli_takim'):
+def upsert_fed_results(athlete: dict, race_leg: str = 'milli_takim',
+                        conn: sqlite3.Connection = None):
     """
     Insert athlete's event results into fed_results table.
     Each (stroke, distance) from event_scores → one row.
+
+    conn: optional shared connection (caller commits/closes). When omitted,
+    opens/commits/closes its own connection — used by batch callers like
+    save_to_database() to avoid one connection per athlete.
     """
-    conn = get_conn()
+    owns_conn = conn is None
+    if owns_conn:
+        conn = get_conn()
     cursor = conn.cursor()
 
     try:
@@ -160,18 +167,25 @@ def upsert_fed_results(athlete: dict, race_leg: str = 'milli_takim'):
                     selected, selected_slot, tied, ranking_key
                 ))
 
-        conn.commit()
+        if owns_conn:
+            conn.commit()
     finally:
-        conn.close()
+        if owns_conn:
+            conn.close()
 
 
-def update_athlete_selection(athlete: dict):
+def update_athlete_selection(athlete: dict, conn: sqlite3.Connection = None):
     """
     Update selection status in fed_athlete_best for all athlete's events.
     Also ensures athlete is present in fed_athlete_best by populating
     from fed_results if needed.
+
+    conn: optional shared connection (caller commits/closes). See
+    upsert_fed_results() docstring for the batch-caller rationale.
     """
-    conn = get_conn()
+    owns_conn = conn is None
+    if owns_conn:
+        conn = get_conn()
     cursor = conn.cursor()
 
     try:
@@ -225,9 +239,11 @@ def update_athlete_selection(athlete: dict):
             WHERE athlete_name = ? AND birth_year = ? AND gender = ?
         """, (selected, selected_slot, tied, ranking_key, name, birth_year, gender))
 
-        conn.commit()
+        if owns_conn:
+            conn.commit()
     finally:
-        conn.close()
+        if owns_conn:
+            conn.close()
 
 
 def get_selected_athletes(birth_year: int = None, selected: str = None) -> list:

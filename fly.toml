@@ -1,0 +1,23 @@
+app = "milli-takim-secme"
+primary_region = "fra"
+
+[build]
+
+[env]
+  PORT = "8765"
+
+[http_service]
+  internal_port = 8765
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[mounts]
+  source = "milli_takim_data"
+  destination = "/app/data"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

@@ -1,0 +1,12 @@
+.git
+__pycache__
+*.pyc
+.pytest_cache
+data/*.db
+data/*.lxf
+database/*.db
+resmi-kadrolar
+.superpowers
+docs
+graphify-out
+*.md

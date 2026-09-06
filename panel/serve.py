@@ -10,6 +10,7 @@ Endpoints:
 """
 
 import json
+import os
 import tempfile
 import sys
 from pathlib import Path
@@ -154,18 +155,32 @@ def apply_selection_status(athletes: list) -> list:
     return apply_selection_status_with_points(athletes)
 
 
-def apply_selection_status_with_points(athletes: list) -> list:
+def apply_selection_status_with_points(athletes: list, leg: str = 'combined') -> list:
     """
     Apply selection status using rank_group logic.
     Handles events dict with time information.
     Adds 'selected', 'multinations', 'selected_slot' fields to each athlete.
+
+    leg: 'combined' (default), 'antalya', or 'edirne'. Antalya/Edirne use that
+    leg's own events (antalya_events / edirne_events, already {event: points}
+    dicts) so each tab's TR/BÖLGE slot reflects a ranking scoped to that leg's
+    results, the same rank_group()-based quota logic used for combined.
+
+    Federasyon Karması rule 2: athletes already selected to the Multinations/
+    Comen Cup/Central European Yıldızlar squads are excluded from TR/BÖLGE
+    eligibility. Callers must run the yıldızlar selection functions (which
+    set selected_yildiz_*) BEFORE calling this, so the exclusion below sees
+    up-to-date flags.
     """
     from collections import defaultdict
 
+    events_field = {'antalya': 'antalya_events', 'edirne': 'edirne_events'}.get(leg)
+
     # Prepare athletes for rank_group: add event_scores = points only from combined_events
     for a in athletes:
-        # Use combined_events_for_ranking if available, else extract from combined_events
-        if 'combined_events_for_ranking' in a:
+        if events_field:
+            a['event_scores'] = a.get(events_field, {}) or {}
+        elif 'combined_events_for_ranking' in a:
             a['event_scores'] = a.get('combined_events_for_ranking', {})
         else:
             combined_events_points = {}
@@ -174,23 +189,39 @@ def apply_selection_status_with_points(athletes: list) -> list:
                 combined_events_points[(stroke, dist)] = points
             a['event_scores'] = combined_events_points
         a['name'] = a.get('athlete_name', '')
+        a['multinations'] = is_multinations(a.get('name'), a.get('birth_year'), a.get('gender', ''))
+
+    def _yildiz_excluded(a):
+        return bool(
+            a.get('selected_yildiz_multinations') or
+            a.get('selected_yildiz_comen_cup_aralik') or a.get('selected_yildiz_comen_cup_nisan') or
+            a.get('selected_yildiz_central_europe_aralik') or a.get('selected_yildiz_central_europe_nisan')
+        )
+
+    eligible = [a for a in athletes if not _yildiz_excluded(a)]
+    excluded = [a for a in athletes if _yildiz_excluded(a)]
+    for a in excluded:
+        a['selected'] = '-'
+        a['selected_slot'] = '-'
+        a['tied'] = False
+        a['ranking_key'] = ()
+        a['top3_total'] = a.get('top3_total', 0)
 
     # Group by birth_year and gender (like rank_all does)
     by_group = defaultdict(list)
-    for a in athletes:
+    for a in eligible:
         key = (a['birth_year'], a['gender'])
         by_group[key].append(a)
 
-    # Apply rank_group to each group
+    # Apply rank_group to each eligible group
     all_ranked = []
     for (birth_year, gender), group in sorted(by_group.items()):
-        # Add multinations flag
-        for a in group:
-            a['multinations'] = is_multinations(a.get('name'), birth_year, gender)
-
-        # Apply ranking and selection
         ranked_group = rank_group(group)
         all_ranked.extend(ranked_group)
+    all_ranked.extend(excluded)
+
+    for a in all_ranked:
+        a['selected_federasyon_karma'] = a.get('selected') in ('TR', 'BÖLGE')
 
     return all_ranked
 
@@ -570,6 +601,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def serve_api_ranking(self):
         """Serve ranking API endpoint."""
+        import time
+        start_time = time.time()
+
         try:
             # Parse query params
             qs = urlparse(self.path).query
@@ -579,6 +613,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             gender = None
             region = None
             leg = params.get('leg', ['combined'])[0]
+
+            timing = {}
 
             if 'birth_year' in params:
                 try:
@@ -595,28 +631,75 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     pass
 
-            # Get athlete rankings with full scoring (all legs computed)
-            athletes = get_athlete_rankings(birth_year, gender, region)
+            # Get athlete rankings with full scoring (all legs computed).
+            # IMPORTANT: do NOT pass birth_year or region here. Multinations/
+            # Comen Cup/Central European Yıldızlar pool athletes across
+            # multiple birth years (e.g. Multinations = 2011+2012+2013
+            # combined), and Federasyon Karması's TR tier ranks nationally
+            # across all regions — both need to see the FULL population
+            # before select_all_yildizlar()/apply_selection_status_with_points()
+            # run. Pre-filtering by birth_year or region here would silently
+            # shrink those pools and produce wrong selections (e.g. a "2013
+            # only" dashboard filter would compute Multinations from 2013
+            # girls alone instead of the real 2011-2013 pool). gender is safe
+            # to pre-filter since every selection rule already splits by
+            # gender internally.
+            t1 = time.time()
+            athletes = get_athlete_rankings(None, gender, None)
+            timing['get_rankings'] = time.time() - t1
+            logger.info(f"API /ranking: get_athlete_rankings took {timing['get_rankings']:.2f}s (leg={leg}, gender={gender})")
 
-            # **IMPORTANT: Filter by leg FIRST before processing**
-            # Only show athletes that have events for the selected leg
+            # Apply yıldızlar selections on the FULL population — see note above.
+            t1 = time.time()
+            athletes = select_all_yildizlar(athletes)
+            timing['yildizlar'] = time.time() - t1
+            logger.info(f"API /ranking: select_all_yildizlar took {timing['yildizlar']:.2f}s")
+
+            # **Filter by leg/birth_year/region** for display only, now that
+            # every selection has been computed on the full pool.
+            t1 = time.time()
             if leg == 'antalya':
                 athletes = [a for a in athletes if len(a['antalya_events']) > 0]
             elif leg == 'edirne':
                 athletes = [a for a in athletes if len(a['edirne_events']) > 0]
             # for 'combined', show all athletes with any events
+            #
+            # birth_year is safe to filter here: Federasyon Karması TR/BÖLGE
+            # quotas are entirely separate per birth_year (rank_group() never
+            # compares across years), so narrowing now doesn't change the
+            # outcome for the remaining year.
+            #
+            # region is NOT filtered here — TR is a single NATIONAL ranking
+            # across all 6 regions for a given birth_year+gender. Filtering
+            # by region before apply_selection_status_with_points() would
+            # rank athletes only against their own region, handing TR slots
+            # to athletes who wouldn't make the real national cutoff (this
+            # was a real bug: passing region=1 put 8 Istanbul athletes in TR
+            # who are actually only BÖLGE per the official roster). The
+            # region filter is applied further below, after selection.
+            if birth_year is not None:
+                athletes = [a for a in athletes if a.get('birth_year') == birth_year]
+            timing['filter_by_leg'] = time.time() - t1
+            logger.info(f"API /ranking: filter_by_leg took {timing['filter_by_leg']:.2f}s, {len(athletes)} athletes")
 
-            # Apply selection status BEFORE converting to JSON (tuple keys needed)
+            # Apply Federasyon Karması TR/BÖLGE selection status for every leg
+            # (antalya/edirne/combined) — each tab shows its own slot, scoped
+            # to that leg's events, excluding athletes already selected above
+            # to Multinations/Comen Cup/Central European Yıldızlar.
             try:
-                # Extract points only from combined_events for rank_group (ignore time)
-                for a in athletes:
-                    combined_events_points_only = {}
-                    for (stroke, dist), data in a.get('combined_events', {}).items():
-                        points = data.get('points', 0) if isinstance(data, dict) else data
-                        combined_events_points_only[(stroke, dist)] = points
-                    a['combined_events_for_ranking'] = combined_events_points_only
+                t1 = time.time()
+                if leg == 'combined':
+                    for a in athletes:
+                        combined_events_points_only = {}
+                        for (stroke, dist), data in a.get('combined_events', {}).items():
+                            points = data.get('points', 0) if isinstance(data, dict) else data
+                            combined_events_points_only[(stroke, dist)] = points
+                        a['combined_events_for_ranking'] = combined_events_points_only
 
-                athletes = apply_selection_status_with_points(athletes)
+                athletes = apply_selection_status_with_points(athletes, leg=leg)
+
+                timing['selection_status'] = time.time() - t1
+                logger.info(f"API /ranking: apply_selection_status took {timing['selection_status']:.2f}s (leg={leg})")
             except Exception as e:
                 logger.warning(f"Error applying selection status: {e}")
                 # Fallback: set default values
@@ -625,8 +708,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     a['selected_slot'] = '-'
                     a['multinations'] = False
 
-            # Apply yíldízlar selections
-            athletes = select_all_yildizlar(athletes)
+            # Region filter for display, now that TR (national) has already
+            # been computed against the full cross-region pool.
+            if region is not None:
+                athletes = [a for a in athletes if a.get('region') == region]
 
             # Transform to API response format
             response_athletes = []
@@ -654,7 +739,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
                 # Show points for all birth years (federation selections apply to all ages)
                 birth_year = athlete['birth_year']
-                display_top3 = athlete['combined_top3']
+                # display_top3 was already set above based on leg filter - don't override it
                 selected = athlete.get('selected', '-')
                 selected_slot = athlete.get('selected_slot', '-')
                 multinations = athlete.get('multinations', False)
@@ -677,13 +762,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'selected_slot': selected_slot,
                     'multinations': multinations,
                     'selected_yildiz_multinations': athlete.get('selected_yildiz_multinations', False),
+                    'candidate_yildiz_multinations': athlete.get('candidate_yildiz_multinations', False),
+                    'candidate_relay_yildiz_multinations': athlete.get('candidate_relay_yildiz_multinations', False),
                     'coach_called_yildiz_multinations': athlete.get('coach_called_yildiz_multinations', False),
                     'selected_yildiz_comen_cup_aralik': athlete.get('selected_yildiz_comen_cup_aralik', False),
                     'selected_yildiz_comen_cup_nisan': athlete.get('selected_yildiz_comen_cup_nisan', False),
+                    'candidate_relay_yildiz_comen_cup_aralik': athlete.get('candidate_relay_yildiz_comen_cup_aralik', False),
+                    'candidate_relay_yildiz_comen_cup_nisan': athlete.get('candidate_relay_yildiz_comen_cup_nisan', False),
                     'coach_called_yildiz_comen_cup_aralik': athlete.get('coach_called_yildiz_comen_cup_aralik', False),
                     'coach_called_yildiz_comen_cup_nisan': athlete.get('coach_called_yildiz_comen_cup_nisan', False),
                     'selected_yildiz_central_europe_aralik': athlete.get('selected_yildiz_central_europe_aralik', False),
                     'selected_yildiz_central_europe_nisan': athlete.get('selected_yildiz_central_europe_nisan', False),
+                    'candidate_yildiz_central_europe_aralik': athlete.get('candidate_yildiz_central_europe_aralik', False),
+                    'candidate_yildiz_central_europe_nisan': athlete.get('candidate_yildiz_central_europe_nisan', False),
+                    'candidate_relay_yildiz_central_europe_aralik': athlete.get('candidate_relay_yildiz_central_europe_aralik', False),
+                    'candidate_relay_yildiz_central_europe_nisan': athlete.get('candidate_relay_yildiz_central_europe_nisan', False),
                     'coach_called_yildiz_central_europe_aralik': athlete.get('coach_called_yildiz_central_europe_aralik', False),
                     'coach_called_yildiz_central_europe_nisan': athlete.get('coach_called_yildiz_central_europe_nisan', False),
                 })
@@ -691,12 +784,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
             # All athletes visible (scoring applies to all age groups)
 
             # Send JSON response
+            t1 = time.time()
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
 
             response_json = json.dumps(response_athletes, ensure_ascii=False, indent=2)
             self.wfile.write(response_json.encode('utf-8'))
+            timing['json_response'] = time.time() - t1
+
+            total_time = time.time() - start_time
+            logger.info(f"API /api/ranking TOTAL: {total_time:.2f}s | get_rankings={timing.get('get_rankings', 0):.2f}s | filter={timing.get('filter_by_leg', 0):.2f}s | selection={timing.get('selection_status', 0):.2f}s | yildizlar={timing.get('yildizlar', 0):.2f}s | json={timing.get('json_response', 0):.2f}s")
 
         except Exception as e:
             logger.error(f"Error in /api/ranking: {e}", exc_info=True)
@@ -718,14 +816,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     pass
 
-            # Get all athletes filtered by region
-            athletes = get_athlete_rankings(None, None, region)
+            # Get the FULL population (region NOT passed here — TR is a
+            # national ranking across all 6 regions; filtering by region
+            # before selection would rank athletes only against their own
+            # region and hand TR slots to athletes who wouldn't make the
+            # real national cutoff — same bug already fixed in
+            # serve_api_ranking()).
+            athletes = get_athlete_rankings(None, None, None)
+
+            # Yıldızlar selections on the full population, before anything
+            # narrows the pool (same reasoning as serve_api_ranking()).
+            athletes = select_all_yildizlar(athletes)
 
             # Filter by leg
             if leg == 'antalya':
                 athletes = [a for a in athletes if len(a['antalya_events']) > 0]
             elif leg == 'edirne':
                 athletes = [a for a in athletes if len(a['edirne_events']) > 0]
+
+            # Apply selection status (similar to main ranking) on the full,
+            # cross-region pool.
+            for a in athletes:
+                combined_events_points = {}
+                for (stroke, dist), data in a.get('combined_events', {}).items():
+                    points = data.get('points', 0) if isinstance(data, dict) else data
+                    combined_events_points[(stroke, dist)] = points
+                a['combined_events_for_ranking'] = combined_events_points
+
+            athletes = apply_selection_status_with_points(athletes, leg=leg)
+
+            # NOW filter to the requested region, for display only.
+            if region is not None:
+                athletes = [a for a in athletes if a.get('region') == region]
 
             # Sort by top3 within region
             if leg == 'antalya':
@@ -734,16 +856,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 athletes = sorted(athletes, key=lambda a: -a['edirne_top3'])
             else:
                 athletes = sorted(athletes, key=lambda a: -a['combined_top3'])
-
-            # Apply selection status (similar to main ranking)
-            for a in athletes:
-                combined_events_points = {}
-                for (stroke, dist), data in a.get('combined_events', {}).items():
-                    points = data.get('points', 0) if isinstance(data, dict) else data
-                    combined_events_points[(stroke, dist)] = points
-                a['combined_events_for_ranking'] = combined_events_points
-
-            athletes = apply_selection_status_with_points(athletes)
 
             # Build response (same format as main ranking)
             response_athletes = []
@@ -800,14 +912,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if 'gender' in params:
                 gender = params['gender'][0] if params['gender'][0] else None
 
-            # Get athlete rankings
-            athletes = get_athlete_rankings(birth_year, gender, None)
+            # Get athlete rankings. birth_year is intentionally NOT passed here
+            # — see the matching note in serve_api_ranking(): Multinations/
+            # Comen Cup/Central European pool multiple birth years together,
+            # so filtering before select_all_yildizlar() would compute those
+            # selections from the wrong, narrowed pool.
+            athletes = get_athlete_rankings(None, gender, None)
 
-            # Filter by leg
+            # Yıldızlar selections FIRST, on the full population (same reason
+            # as /api/ranking: nationwide quotas must see every eligible
+            # athlete before the leg filter shrinks the pool).
+            athletes = select_all_yildizlar(athletes)
+
+            # Filter by leg/birth_year for display, now that every selection
+            # has been computed on the full pool.
             if leg == 'antalya':
                 athletes = [a for a in athletes if len(a['antalya_events']) > 0]
             elif leg == 'edirne':
                 athletes = [a for a in athletes if len(a['edirne_events']) > 0]
+            if birth_year is not None:
+                athletes = [a for a in athletes if a.get('birth_year') == birth_year]
 
             # Apply selection status BEFORE converting to JSON (tuple keys needed)
             try:
@@ -819,7 +943,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         combined_events_points_only[(stroke, dist)] = points
                     a['combined_events_for_ranking'] = combined_events_points_only
 
-                athletes = apply_selection_status_with_points(athletes)
+                athletes = apply_selection_status_with_points(athletes, leg=leg)
             except Exception as e:
                 logger.warning(f"Error applying selection status: {e}")
                 # Fallback: set default values
@@ -1011,9 +1135,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             result = None
             t_process = 0
             try:
+                race_leg = 'antalya'  # default
+                if filename and 'edirne' in filename.lower():
+                    race_leg = 'edirne'
+
                 t0 = time.time()
                 pipeline = MiltiTakimPipeline()
-                result = pipeline.process(file_content_bytes)
+                result = pipeline.process(file_content_bytes, race_leg=race_leg)
                 t_process = time.time() - t0
                 logger.info(f"MiltiTakimPipeline.process took {t_process:.2f}s")
             finally:
@@ -1053,11 +1181,13 @@ def main():
     from federasyon.db_fed import migrate_add_selection_columns
     migrate_add_selection_columns()
 
-    server = HTTPServer(('localhost', 8765), DashboardHandler)
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', 8765))
+    server = HTTPServer((host, port), DashboardHandler)
     print("=" * 60)
     print("Milli Takım Seçme — Dashboard")
     print("=" * 60)
-    print(f"Server running: http://localhost:8765")
+    print(f"Server running: http://{host}:{port}")
     print(f"Database: {DB_PATH}")
     print("Press Ctrl+C to stop")
     print("=" * 60)

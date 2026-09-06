@@ -12,7 +12,6 @@ Tie kuralı:
 from itertools import groupby as _groupby
 from .scorer import best_scores_sequence, compute_ranking_key
 from .scoring_tables import SELECTION_QUOTAS
-from .multinations import is_multinations
 
 
 def _select_with_tie(lst: list[dict], quota: int,
@@ -57,6 +56,14 @@ def _select_with_tie(lst: list[dict], quota: int,
 
 
 def rank_group(athletes: list[dict]) -> list[dict]:
+    """
+    Rank one (birth_year, gender) group for Federasyon Karması TR/BÖLGE selection.
+
+    Callers are responsible for excluding athletes already selected to the
+    Multinations/Comen Cup/Central European Yıldızlar squads BEFORE calling
+    this (per Federasyon Karması rule 2) — this function ranks whatever list
+    it's given by points alone, with no Multinations-specific bucketing.
+    """
     if not athletes:
         return []
 
@@ -64,16 +71,9 @@ def rank_group(athletes: list[dict]) -> list[dict]:
     quotas = SELECTION_QUOTAS.get(by, {"tr": 0, "region_1": 0, "region_other": 0, "min_points": 7})
     min_pts = quotas["min_points"]
 
-    # ── Multinations / normal ayır ────────────────────────────────────────────
-    multi_athletes  = []
-    normal_athletes = []
-    for a in athletes:
-        if is_multinations(a["name"], a["birth_year"], a.get("gender", "")):
-            multi_athletes.append(a)
-        else:
-            normal_athletes.append(a)
+    normal_athletes = list(athletes)
 
-    # ── Normal: puan dizisi hesapla ───────────────────────────────────────────
+    # ── Puan dizisi hesapla ───────────────────────────────────────────────────
     for a in normal_athletes:
         es = a.get("event_scores", {})
         a["seq"]         = best_scores_sequence(es)
@@ -116,21 +116,7 @@ def rank_group(athletes: list[dict]) -> list[dict]:
         if not a["qualifies"]:
             a["selected"] = "BARAJ_YOK"
 
-    # ── Multinations ─────────────────────────────────────────────────────────
-    for a in multi_athletes:
-        es = a.get("event_scores", {})
-        a["seq"]           = best_scores_sequence(es)
-        a["top3_total"]    = sum(a["seq"][:3])
-        a["ranking_key"]   = compute_ranking_key(es)
-        a["qualifies"]     = True
-        a["tr_rank"]       = 0
-        a["selected"]      = "MULTINATIONS"
-        a["selected_slot"] = "MULTI"
-        a["region_rank"]   = None
-        a["tied"]          = False
-
-    multi_athletes.sort(key=lambda a: a["ranking_key"])
-    return multi_athletes + sorted_normal
+    return sorted_normal
 
 
 def rank_all(athletes: list[dict]) -> list[dict]:

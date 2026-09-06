@@ -22,6 +22,7 @@ Kullanım:
 
 import re
 import unicodedata
+from functools import lru_cache
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Türkçe → ASCII karakter tablosu
@@ -161,6 +162,7 @@ def _clean_punctuation(text: str) -> str:
 # 4. Dışa açık fonksiyonlar
 # ─────────────────────────────────────────────────────────────────────────────
 
+@lru_cache(maxsize=4096)
 def normalize_for_lookup(text: str | None) -> str:
     """
     Eşleştirme/arama için normalize eder.

@@ -422,6 +422,14 @@ def get_athlete_rankings(birth_year: int = None, gender: str = None, region: int
         query += " AND region = ?"
         params.append(region)
 
+    # Deterministic row order: without this, SQLite doesn't guarantee row
+    # order for a plain scan, so the athlete list this builds could come
+    # out in a different order across processes/connections (even for
+    # identical, unchanged data) — silently reshuffling which athlete wins
+    # a ranking_key tie downstream, since rank_group()'s stable sort
+    # preserves whatever order it was handed.
+    query += " ORDER BY id ASC"
+
     try:
         cursor = conn.execute(query, params)
         rows = cursor.fetchall()

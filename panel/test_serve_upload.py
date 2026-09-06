@@ -86,6 +86,60 @@ class TestHandleUploadIntegration:
             handler.send_header.assert_called()
             handler.end_headers.assert_called()
 
+    def _upload_with_filename(self, mock_pipeline_class, filename):
+        """Helper: simulate an upload of `filename` and return the race_leg
+        kwarg that handle_upload passed to pipeline.process()."""
+        from panel.serve import DashboardHandler
+
+        mock_pipeline_instance = MagicMock()
+        mock_pipeline_class.return_value = mock_pipeline_instance
+        mock_pipeline_instance.process.return_value = {
+            'success': True, 'message': 'ok', 'selected_tr': [], 'selected_bolge': [],
+            'baraj_yok_count': 0, 'total_athletes': 0, 'summary': {}
+        }
+
+        handler = MagicMock(spec=DashboardHandler)
+        handler.wfile = Mock()
+
+        boundary = 'boundary123'
+        content = (
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f'Content-Type: application/octet-stream\r\n'
+            f'\r\n'
+            f'test file content'
+            f'\r\n--{boundary}--\r\n'
+        ).encode('utf-8')
+
+        handler.headers = {
+            'Content-Length': str(len(content)),
+            'Content-Type': f'multipart/form-data; boundary={boundary}'
+        }
+        handler.rfile = BytesIO(content)
+
+        with patch('panel.serve.Path.unlink'):
+            DashboardHandler.handle_upload(handler)
+
+        _, kwargs = mock_pipeline_instance.process.call_args
+        return kwargs.get('race_leg')
+
+    def test_handle_upload_detects_edirne_leg_from_filename(self):
+        """Uploading a file with 'edirne' in the name must tag results as
+        race_leg='edirne' (regression: Task 4 refactor dropped this filename
+        detection, so every upload got hardcoded 'milli_takim', which the
+        dashboard's antalya/edirne split (database/db.py) always buckets as
+        edirne — antalya uploads showed up under the Edirne tab)."""
+        with patch('panel.serve.MiltiTakimPipeline') as mock_pipeline_class:
+            race_leg = self._upload_with_filename(mock_pipeline_class, 'edirne_millitakim_secme_sonuc.lxf')
+        assert race_leg == 'edirne'
+
+    def test_handle_upload_detects_antalya_leg_from_filename(self):
+        """Uploading a file with 'antalya' (or no leg keyword) in the name
+        must tag results as race_leg='antalya'."""
+        with patch('panel.serve.MiltiTakimPipeline') as mock_pipeline_class:
+            race_leg = self._upload_with_filename(mock_pipeline_class, 'antalya_millitakim_secme_sonuc.lxf')
+        assert race_leg == 'antalya'
+
     def test_handle_upload_response_format(self):
         """handle_upload response should have all required keys from pipeline"""
         from panel.serve import DashboardHandler
@@ -290,8 +344,17 @@ class TestHandleUploadIntegration:
                 assert response_json['success'] is False
                 assert 'error' in response_json
 
-    def test_handle_upload_no_race_leg_parameter(self):
-        """handle_upload should NOT pass race_leg to pipeline"""
+    def test_handle_upload_passes_race_leg_detected_from_filename(self):
+        """handle_upload MUST pass race_leg to pipeline, detected from filename.
+
+        This replaces a prior test that asserted the opposite (no race_leg
+        passed at all). That assumption was the actual bug: the Task 4
+        refactor (commit 08b933d) dropped filename-based leg detection
+        assuming "the pipeline handles it internally", but the pipeline just
+        hardcoded race_leg='milli_takim' for every upload. Since the
+        dashboard's antalya/edirne split (database/db.py) buckets anything
+        that isn't literally 'antalya' into the Edirne tab, every Antalya
+        upload silently showed up under Edirne."""
         from panel.serve import DashboardHandler
 
         with patch('panel.serve.MiltiTakimPipeline') as mock_pipeline_class:
@@ -329,17 +392,9 @@ class TestHandleUploadIntegration:
             with patch('panel.serve.Path.unlink'):
                 DashboardHandler.handle_upload(handler)
 
-            # Verify process was called with ONLY the temp file path
             mock_pipeline_instance.process.assert_called_once()
-
-            # Get the call arguments
-            call_args = mock_pipeline_instance.process.call_args
-
-            # Should be called with one positional argument (the file path)
-            assert len(call_args[0]) == 1 or len(call_args[1]) == 0
-
-            # Should NOT have race_leg as a keyword argument
-            assert 'race_leg' not in call_args[1]
+            _, kwargs = mock_pipeline_instance.process.call_args
+            assert kwargs.get('race_leg') == 'edirne'
 
     def test_handle_upload_temp_file_cleanup(self):
         """handle_upload should clean up temp file after processing"""
@@ -475,6 +530,91 @@ class TestHandleUploadRegressions:
                 response_str = response_data[0].decode('utf-8')
                 assert 'İstanbul' in response_str
                 assert 'Yılmaz' in response_str
+
+
+class TestYildizlarBirthYearPooling:
+    """
+    Regression test: Multinations/Comen Cup/Central European Yıldızlar pool
+    athletes ACROSS multiple birth years (e.g. Multinations = 2011+2012+2013
+    combined). serve_api_ranking() must fetch the full population (birth_year
+    param NOT passed to get_athlete_rankings) and run select_all_yildizlar()
+    on it BEFORE narrowing to the requested birth_year for display — doing it
+    in the other order would compute e.g. Multinations from 2013 girls alone
+    instead of the real 2011-2013 pool.
+
+    Exercises the actual DashboardHandler.serve_api_ranking() code path (not
+    the raw db/ranker functions in isolation) so it fails if a future change
+    reintroduces early birth_year/region filtering. Requires real uploaded
+    LXF data in the DB — skipped otherwise.
+    """
+
+    def _call_ranking(self, path):
+        from panel.serve import DashboardHandler
+        import json as json_mod
+
+        handler = MagicMock(spec=DashboardHandler)
+        handler.path = path
+        response_data = []
+        handler.wfile = Mock()
+        handler.wfile.write = lambda data: response_data.append(data)
+
+        DashboardHandler.serve_api_ranking(handler)
+
+        if not response_data:
+            pytest.skip("No response written — no athlete data in database")
+        body = b''.join(response_data).decode('utf-8')
+        return json_mod.loads(body)
+
+    def test_multinations_selection_same_with_and_without_birth_year_filter(self):
+        full = self._call_ranking('/api/ranking?leg=combined&gender=F')
+        if not full:
+            pytest.skip("No athlete data in database — run an upload first")
+        full_2013_multi = {
+            a['athlete_name'] for a in full
+            if a.get('birth_year') == 2013 and a.get('selected_yildiz_multinations')
+        }
+
+        filtered = self._call_ranking('/api/ranking?leg=combined&gender=F&birth_year=2013')
+        filtered_multi = {
+            a['athlete_name'] for a in filtered
+            if a.get('selected_yildiz_multinations')
+        }
+
+        # candidate_yildiz_multinations / candidate_relay_yildiz_multinations
+        # must be forwarded to the API response (regression: they were
+        # computed by select_yildizlar_multinations() but silently dropped
+        # by serve_api_ranking()'s explicit response-field whitelist).
+        assert full and 'candidate_yildiz_multinations' in full[0]
+        assert full and 'candidate_relay_yildiz_multinations' in full[0]
+
+        assert full_2013_multi == filtered_multi, (
+            "Multinations selection for 2013 girls differs depending on "
+            "whether a birth_year=2013 filter was applied — the dashboard's "
+            "birth-year filter must only affect display, not which athletes "
+            "get selected to a cross-birth-year Yıldızlar competition."
+        )
+
+    def test_tr_selection_same_with_and_without_region_filter(self):
+        """Federasyon Karması TR is a single NATIONAL ranking across all 6
+        regions. Regression: passing region=N used to narrow the pool to
+        that region BEFORE ranking, so athletes competed only against their
+        own region for the national TR slots — real-world case: a
+        region=1 (Istanbul) query put 8 Istanbul athletes in TR who are
+        actually only BÖLGE-eligible per the official TYF roster, because
+        they were ranked against Istanbul alone instead of nationally."""
+        full = self._call_ranking('/api/ranking?leg=combined&birth_year=2013&gender=M')
+        if not full:
+            pytest.skip("No athlete data in database — run an upload first")
+        full_tr = {a['athlete_name'] for a in full if a.get('selected') == 'TR'}
+
+        region1 = self._call_ranking('/api/ranking?leg=combined&birth_year=2013&gender=M&region=1')
+        region1_tr = {a['athlete_name'] for a in region1 if a.get('selected') == 'TR'}
+
+        assert region1_tr == (full_tr & {a['athlete_name'] for a in region1}), (
+            "TR selection differs depending on whether a region filter was "
+            "applied — TR must be ranked nationally before the region "
+            "filter narrows the pool for display."
+        )
 
 
 if __name__ == '__main__':

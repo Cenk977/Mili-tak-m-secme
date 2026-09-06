@@ -67,12 +67,15 @@ class MiltiTakimPipeline:
         """Initialize the pipeline (schema migration happens lazily in process())."""
         logger.info("MiltiTakimPipeline initialized")
 
-    def process(self, lxf_path: str) -> Dict[str, Any]:
+    def process(self, lxf_path: str, race_leg: str = 'antalya') -> Dict[str, Any]:
         """
         Main orchestration method.
 
         Args:
             lxf_path: Path to LXF file
+            race_leg: Which competition leg these results belong to
+                      ('antalya' or 'edirne') — the dashboard's leg tabs and
+                      antalya/edirne top3 split (database/db.py) key off this.
 
         Returns:
             Dict with keys:
@@ -104,12 +107,18 @@ class MiltiTakimPipeline:
             ranked = self.rank_athletes(athletes)
             logger.info(f"Ranked {len(ranked)} athletes")
 
+            # Debug: Check event_scores
+            scored_with_events = sum(1 for a in ranked if a.get('event_scores'))
+            logger.info(f"DEBUG: {scored_with_events}/{len(ranked)} athletes have event_scores")
+            if ranked:
+                logger.info(f"DEBUG: First athlete event_scores keys: {list(ranked[0].get('event_scores', {}).keys())}")
+
             # Step 3b: Validate quota enforcement at runtime
             self.validate_results(ranked)
 
             # Step 4: Save to database
-            logger.info("Saving to database...")
-            self.save_to_database(ranked)
+            logger.info(f"Saving to database (race_leg={race_leg})...")
+            self.save_to_database(ranked, race_leg=race_leg)
             logger.info(f"Saved to database")
 
             # Step 5: Build response
@@ -311,15 +320,22 @@ class MiltiTakimPipeline:
             logger.error(f"Ranking error: {e}")
             raise
 
-    def save_to_database(self, ranked_athletes: List[Dict]) -> None:
+    def save_to_database(self, ranked_athletes: List[Dict], race_leg: str = 'milli_takim') -> None:
         """
         Save ranked athletes to database.
         Calls upsert_fed_results() and update_athlete_selection() for each athlete.
 
         Args:
             ranked_athletes: List of ranked athletes with selection info
+            race_leg: Competition leg tag stored on each fed_results row
+                      ('antalya' or 'edirne', typically detected from the
+                      uploaded filename by the caller).
         """
+        from federasyon.db_fed import get_conn
+        conn = get_conn()
         try:
+            logger.info(f"save_to_database: Processing {len(ranked_athletes)} athletes")
+            saved_count = 0
             for athlete in ranked_athletes:
                 # Ensure athlete has all required fields
                 athlete.setdefault('event_scores', {})
@@ -330,15 +346,19 @@ class MiltiTakimPipeline:
 
                 # Save raw results (one row per event)
                 if athlete['event_scores']:
-                    upsert_fed_results(athlete, race_leg='milli_takim')
+                    upsert_fed_results(athlete, race_leg=race_leg, conn=conn)
+                    saved_count += 1
 
                 # Update selection status
-                update_athlete_selection(athlete)
+                update_athlete_selection(athlete, conn=conn)
 
-            logger.info(f"Saved {len(ranked_athletes)} athletes to database")
+            conn.commit()
+            logger.info(f"save_to_database: Saved {saved_count} athletes with event_scores out of {len(ranked_athletes)} total")
         except Exception as e:
             logger.error(f"Database save error: {e}")
             raise
+        finally:
+            conn.close()
 
     def build_response(self, ranked_athletes: List[Dict]) -> Dict[str, Any]:
         """

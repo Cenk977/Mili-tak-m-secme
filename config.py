@@ -6,7 +6,7 @@ Configuration for Milli Takım Seçme Sistemi
 COMPETITION_YEAR = 2027
 
 # Database configuration
-DB_PATH = "data/selection.db"
+DB_PATH = "data/bolge_karmalari.db"
 
 # Excel files
 MAPPING_EXCEL_PATH = "Kulüp Şehir Mapping Exceli/Kulüp Şehir Mapping.xlsx"

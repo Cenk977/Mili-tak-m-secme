@@ -16,36 +16,86 @@ from federasyon.yildizlar_central_europe_barajlari import check_antrenor_baraj a
 
 logger = logging.getLogger(__name__)
 
-# Competition-specific event programs
-COMEN_CUP_FEMALE_PROGRAM = {
-    ('Serbest', 100), ('Serbest', 400), ('Serbest', 800),
+# Event program: SAME branş/mesafe list for all three Yıldızlar competitions
+# (Multinations, Comen Cup, Central European) — confirmed against the
+# antrenör baraj tables in 2026_YILDIZLAR_MILLI_TAKIM_SECILME_KRITERLERI.md,
+# which are identical across all three competitions. Relay events are
+# handled separately by the federation (rule: "bayrak müsabakaları için
+# ... kadroya sporcu davet edebilir") and are not part of this individual
+# event ranking.
+YILDIZLAR_FEMALE_PROGRAM = {
+    ('Serbest', 50), ('Serbest', 100), ('Serbest', 200), ('Serbest', 400), ('Serbest', 800),
     ('Sırtüstü', 50), ('Sırtüstü', 100), ('Sırtüstü', 200),
     ('Kurbağalama', 50), ('Kurbağalama', 100), ('Kurbağalama', 200),
     ('Kelebek', 50), ('Kelebek', 100), ('Kelebek', 200),
     ('Karışık', 200), ('Karışık', 400),
-    ('4x50m Serbest',), ('4x100m Serbest',), ('4x50m Karışık',), ('4x100m Karışık',),
-    ('4x200m Serbest',),
 }
 
-COMEN_CUP_MALE_PROGRAM = {
-    ('Serbest', 50), ('Serbest', 100), ('Serbest', 400),
+YILDIZLAR_MALE_PROGRAM = {
+    ('Serbest', 50), ('Serbest', 100), ('Serbest', 200), ('Serbest', 400), ('Serbest', 1500),
     ('Sırtüstü', 50), ('Sırtüstü', 100), ('Sırtüstü', 200),
     ('Kurbağalama', 50), ('Kurbağalama', 100), ('Kurbağalama', 200),
     ('Kelebek', 50), ('Kelebek', 100), ('Kelebek', 200),
     ('Karışık', 200), ('Karışık', 400),
-    ('4x50m Serbest',), ('4x100m Serbest',), ('4x50m Karışık',), ('4x100m Karışık',),
-    ('4x200m Serbest',),
 }
 
-# CENTRAL: Add all 50m, keep 1500m for males, remove 800m for males
-CENTRAL_FEMALE_PROGRAM = COMEN_CUP_FEMALE_PROGRAM.copy()
-CENTRAL_FEMALE_PROGRAM.update({
-    ('Serbest', 50), ('Sırtüstü', 50), ('Kurbağalama', 50), ('Kelebek', 50),
-})
+# Backward-compatible aliases (Comen/Central used to have their own, slightly
+# inconsistent sets — now unified into one program shared by all three).
+COMEN_CUP_FEMALE_PROGRAM = YILDIZLAR_FEMALE_PROGRAM
+COMEN_CUP_MALE_PROGRAM = YILDIZLAR_MALE_PROGRAM
+CENTRAL_FEMALE_PROGRAM = YILDIZLAR_FEMALE_PROGRAM
+CENTRAL_MALE_PROGRAM = YILDIZLAR_MALE_PROGRAM
 
-CENTRAL_MALE_PROGRAM = COMEN_CUP_MALE_PROGRAM.copy()
-CENTRAL_MALE_PROGRAM.update({('Serbest', 1500)})
-CENTRAL_MALE_PROGRAM.discard(('Serbest', 800))
+# Individual events that correspond to a relay leg. Relays are always swum
+# at 100m per leg (medley: Sırtüstü/Kurbağalama/Kelebek/Serbest 100; free
+# relay: Serbest 100) plus Serbest 200 for the 4x200 free relay. A 50m
+# individual win (e.g. 50m Kelebek) does NOT indicate relay-leg speed, since
+# no Yıldızlar relay is swum over 50m splits for Multinations/Central
+# (Comen Cup additionally has 4x50m relays — not modeled here yet).
+RELAY_LEG_EVENTS = {
+    ('Sırtüstü', 100), ('Kurbağalama', 100), ('Kelebek', 100), ('Serbest', 100),
+    ('Serbest', 200),
+}
+
+# Comen Cup additionally swims 4x50m relays (Serbest, Karışık), so its
+# relay-leg events include the 50m distance per stroke too.
+RELAY_LEG_EVENTS_COMEN = RELAY_LEG_EVENTS | {
+    ('Sırtüstü', 50), ('Kurbağalama', 50), ('Kelebek', 50), ('Serbest', 50),
+}
+
+# How many top finishers per relay-leg event count as "relay candidate"
+# depth. Not an official federation number — the rule text only says the
+# federation "may invite" athletes for relay purposes at its own discretion
+# (e.g. Multinations rule 8); this is a heuristic to surface plausible
+# candidates for a human to confirm, not a hard cutoff.
+RELAY_CANDIDATE_TOP_N = 6
+
+
+def _relay_candidate_ids(eligible_athletes: list, event_times_key: str, exclude_ids: set,
+                          relay_events: set = RELAY_LEG_EVENTS,
+                          top_n: int = RELAY_CANDIDATE_TOP_N) -> set:
+    """
+    Athlete IDs (not already in exclude_ids) who rank in the top `top_n` of
+    ANY relay-leg event (relay_events — RELAY_LEG_EVENTS for Multinations/
+    Central European, RELAY_LEG_EVENTS_COMEN for Comen Cup's extra 4x50m
+    relays) among eligible_athletes.
+
+    Rationale: relay legs are swum at fixed distances (50m/100m/200m
+    depending on competition), so an athlete can be relay-valuable
+    (consistently near the top at those specific distances) without ever
+    winning an individual event outright — the reverse also holds: winning
+    a distance that has no matching relay leg doesn't by itself indicate
+    relay speed.
+    """
+    rankings = _build_group_rankings(eligible_athletes, event_times_key, relay_events)
+    candidate_ids = set()
+    for event, ranked in rankings.items():
+        for entry in ranked[:top_n]:
+            aid = entry['athlete_id']
+            if aid not in exclude_ids:
+                candidate_ids.add(aid)
+    return candidate_ids
+
 
 def parse_time(time_str: str) -> float:
     """Parse time string to seconds."""
@@ -61,6 +111,81 @@ def parse_time(time_str: str) -> float:
         return float(time_str)
     except (ValueError, TypeError):
         return float('inf')
+
+def _build_group_rankings(eligible_athletes: list, event_times_key: str, program_filter: set = None) -> dict:
+    """
+    Precompute, ONCE per group (instead of once per athlete), the ranked
+    (time-sorted) athlete list for every event the group has times for.
+
+    Performance note: the old get_first_place_events/count_events_by_rank/
+    count_first_places functions each independently rescanned every event
+    for every athlete in the group (O(n) group scans x O(n log n) sort,
+    repeated n times => O(n^2 log n) for a group of n athletes). This
+    factors that shared per-event sort out into a single O(n log n) pass
+    per event, computed once and reused for every athlete's stats.
+
+    Returns: dict event_key -> list of {'athlete_id', 'time_sec'} sorted by
+    time_sec ascending (ties broken by original eligible_athletes order,
+    matching Python's stable sort — identical tie-break semantics to the
+    original per-athlete implementation).
+    """
+    all_events = set()
+    for a in eligible_athletes:
+        for event_key in a.get(event_times_key, {}).keys():
+            if program_filter is None or event_key in program_filter:
+                all_events.add(event_key)
+
+    rankings = {}
+    for event_key in all_events:
+        times_list = []
+        for a in eligible_athletes:
+            time_str = a.get(event_times_key, {}).get(event_key)
+            time_sec = parse_time(time_str)
+            if time_sec != float('inf'):
+                times_list.append({'athlete_id': a.get('athlete_id'), 'time_sec': time_sec})
+        times_list.sort(key=lambda x: x['time_sec'])
+        rankings[event_key] = times_list
+
+    return rankings
+
+
+def _compute_group_stats(eligible_athletes: list, event_times_key: str, program_filter: set = None) -> dict:
+    """
+    Compute, for every athlete in the group in a single pass, the same
+    (first_count, second_count, third_count, first_events) stats that
+    get_first_place_events/count_events_by_rank/count_first_places used to
+    compute independently per athlete. See _build_group_rankings for why
+    this replaces O(n^2 log n) with O(n log n).
+
+    Returns: dict athlete_id -> {'first': int, 'second': int, 'third': int,
+                                  'first_events': list[event_key]}
+    first_events preserves the same set-iteration order as the original
+    per-athlete get_first_place_events (built from the identical all_events
+    set construction), since first_events[4:] slicing feeds selection rules.
+    """
+    rankings = _build_group_rankings(eligible_athletes, event_times_key, program_filter)
+    stats = {a.get('athlete_id'): {'first': 0, 'second': 0, 'third': 0, 'first_events': []}
+              for a in eligible_athletes}
+
+    # Iterate event_keys in the same order _build_group_rankings inserted them
+    # (dict preserves insertion order), matching the original set-iteration order.
+    for event_key, ranked in rankings.items():
+        if len(ranked) >= 1:
+            aid = ranked[0]['athlete_id']
+            if aid in stats:
+                stats[aid]['first'] += 1
+                stats[aid]['first_events'].append(event_key)
+        if len(ranked) >= 2:
+            aid = ranked[1]['athlete_id']
+            if aid in stats:
+                stats[aid]['second'] += 1
+        if len(ranked) >= 3:
+            aid = ranked[2]['athlete_id']
+            if aid in stats:
+                stats[aid]['third'] += 1
+
+    return stats
+
 
 def get_first_place_events(athlete_id: int, eligible_athletes: list, event_times_key: str, program_filter: set = None) -> list:
     """Get event_keys where athlete placed 1st (filtered by program if provided)."""
@@ -166,41 +291,79 @@ def count_first_places(athlete_id: int, eligible_athletes: list, event_times_key
 
     return first_place_count
 
+MULTINATIONS_QUOTA = 10
+
+
 def select_yildizlar_multinations(athletes):
-    """Multinations: Top 10F+10M. Rules: if <10 1st places, add 2nd/3rd. If ≥10, rank by (1st,2nd,3rd)."""
+    """Multinations: quota is 10F+10M, but per the rule text the squad is
+    only padded to quota — or trimmed below it — "Türkiye Yüzme Federasyonu
+    tarafından" (at the federation's discretion), not automatically:
+      - Kesin (definite): every athlete with >=1 actual 1st place. Always
+        selected, regardless of whether that count is above or below quota
+        (trimming an over-quota field down to exactly 10 is itself a
+        federation judgment call this app doesn't make).
+      - Aday (candidate): only when there are FEWER than 10 winners, the
+        next-best athletes by (2nd, 3rd place count) that the federation
+        MAY invite to approach the quota. Flagged separately
+        (candidate_yildiz_multinations) — never auto-selected — so the
+        dashboard can show them as "aday" for a human decision, including
+        completing relay teams.
+
+    Comparing this against the real 2026MULTIYILDIZ.pdf roster confirmed
+    the old always-pad-to-10 behavior over-selected: the federation kept
+    the men's squad at 8 real winners rather than padding to 10.
+    """
     eligible = [a for a in athletes if 2011 <= a.get('birth_year') <= 2013]
     females = [a for a in eligible if a.get('gender') == 'F']
     males = [a for a in eligible if a.get('gender') == 'M']
 
-    for athlete_list in [females, males]:
+    programs = {'F': YILDIZLAR_FEMALE_PROGRAM, 'M': YILDIZLAR_MALE_PROGRAM}
+    for gender, athlete_list in [('F', females), ('M', males)]:
+        stats = _compute_group_stats(athlete_list, 'antalya_events_time', programs[gender])
         for athlete in athlete_list:
-            aid = athlete.get('athlete_id')
-            athlete['_first'] = count_first_places(aid, athlete_list, 'antalya_events_time')
-            athlete['_second'] = count_events_by_rank(aid, athlete_list, 'antalya_events_time', 2)
-            athlete['_third'] = count_events_by_rank(aid, athlete_list, 'antalya_events_time', 3)
+            s = stats.get(athlete.get('athlete_id'), {'first': 0, 'second': 0, 'third': 0})
+            athlete['_first'] = s['first']
+            athlete['_second'] = s['second']
+            athlete['_third'] = s['third']
 
     def select_group(group):
         with_first = [a for a in group if a.get('_first', 0) > 0]
         without_first = [a for a in group if a.get('_first', 0) == 0]
-        if len(with_first) < 10:
+        candidates = []
+        if len(with_first) < MULTINATIONS_QUOTA:
             without_first.sort(key=lambda x: (x.get('_second', 0), x.get('_third', 0)), reverse=True)
-            return with_first + without_first[:10 - len(with_first)]
-        else:
-            with_first.sort(key=lambda x: (x.get('_first', 0), x.get('_second', 0), x.get('_third', 0)), reverse=True)
-            return with_first[:10]
+            pool = without_first[:MULTINATIONS_QUOTA - len(with_first)]
+            candidates = [a for a in pool if a.get('_second', 0) > 0 or a.get('_third', 0) > 0]
+        return with_first, candidates
 
-    sel_f = select_group(females)
-    sel_m = select_group(males)
+    sel_f, cand_f = select_group(females)
+    sel_m, cand_m = select_group(males)
     sel_ids = {a.get('athlete_id') for a in sel_f + sel_m}
+    cand_ids = {a.get('athlete_id') for a in cand_f + cand_m}
+
+    # Relay-leg depth candidates: independent of quota fill — an athlete can
+    # be relay-valuable (top-N over 100m/200m) even when the individual-win
+    # quota is already full of OTHER athletes. See RELAY_LEG_EVENTS docstring.
+    relay_cand_f = _relay_candidate_ids(females, 'antalya_events_time', sel_ids)
+    relay_cand_m = _relay_candidate_ids(males, 'antalya_events_time', sel_ids)
+    relay_cand_ids = relay_cand_f | relay_cand_m
 
     for athlete in athletes:
-        if athlete.get('athlete_id') in sel_ids:
+        aid = athlete.get('athlete_id')
+        athlete['candidate_relay_yildiz_multinations'] = aid in relay_cand_ids
+        if aid in sel_ids:
             athlete['selected_yildiz_multinations'] = True
+            athlete['candidate_yildiz_multinations'] = False
             passes_baraj = any(check_multi_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
                              for (s, d) in athlete.get('combined_events', {}))
             athlete['coach_called_yildiz_multinations'] = passes_baraj
+        elif aid in cand_ids:
+            athlete['selected_yildiz_multinations'] = False
+            athlete['candidate_yildiz_multinations'] = True
+            athlete['coach_called_yildiz_multinations'] = False
         else:
             athlete['selected_yildiz_multinations'] = False
+            athlete['candidate_yildiz_multinations'] = False
             athlete['coach_called_yildiz_multinations'] = False
         for k in ['_first', '_second', '_third']:
             athlete.pop(k, None)
@@ -208,19 +371,38 @@ def select_yildizlar_multinations(athletes):
     return athletes
 
 def select_yildizlar_comen_cup_aralik(athletes):
-    """COMEN Aralık: All 1st in program. 4+ rule: keep best 4, add 2nd for 5th+."""
+    """COMEN Cup: winners are determined by the BEST result across BOTH
+    selection meets combined (Aralık/Antalya + Nisan/Edirne), pooled into
+    one ranking per event — not two independent per-meet winner checks.
+    (Named "_aralik" for historical/field-naming reasons; it and
+    select_yildizlar_comen_cup_nisan() compute the identical combined
+    result, same as Central European's _aralik/_nisan pair already did.)
+
+    All 1st-place-in-program winners are selected. 4+ rule: an athlete who
+    wins more than 4 events keeps their best 4; for the 5th+ win, the
+    2nd-place finisher in that specific event is invited instead (rule
+    text: mandatory "davet edilir", not discretionary).
+
+    Regression: using 'antalya_events_time' alone here (and
+    'edirne_events_time' alone in the old _nisan) let an athlete "win" a
+    meet-local comparison even though a teammate's true combined-best time
+    across both meets was faster — comparing against the real 2026 Comen
+    Cup Mediterranean roster (11 athletes) showed exactly this: 6 extra
+    "winners" that don't exist once results are correctly pooled."""
     females = [a for a in athletes if a['gender'] == 'F' and 2011 <= a.get('birth_year') <= 2013]
     males = [a for a in athletes if a['gender'] == 'M' and 2010 <= a.get('birth_year') <= 2012]
 
+    stats_f = _compute_group_stats(females, 'combined_events_time', COMEN_CUP_FEMALE_PROGRAM)
     for athlete in females:
-        first_events = get_first_place_events(athlete['athlete_id'], females, 'antalya_events_time', COMEN_CUP_FEMALE_PROGRAM)
-        athlete['_first_events'] = first_events
-        athlete['_first_count'] = len(first_events)
+        s = stats_f.get(athlete['athlete_id'], {'first_events': [], 'first': 0})
+        athlete['_first_events'] = s['first_events']
+        athlete['_first_count'] = s['first']
 
+    stats_m = _compute_group_stats(males, 'combined_events_time', COMEN_CUP_MALE_PROGRAM)
     for athlete in males:
-        first_events = get_first_place_events(athlete['athlete_id'], males, 'antalya_events_time', COMEN_CUP_MALE_PROGRAM)
-        athlete['_first_events'] = first_events
-        athlete['_first_count'] = len(first_events)
+        s = stats_m.get(athlete['athlete_id'], {'first_events': [], 'first': 0})
+        athlete['_first_events'] = s['first_events']
+        athlete['_first_count'] = s['first']
 
     sel_f = [a for a in females if a['_first_count'] > 0]
     sel_m = [a for a in males if a['_first_count'] > 0]
@@ -231,15 +413,20 @@ def select_yildizlar_comen_cup_aralik(athletes):
     for athlete in sel_f + sel_m:
         if athlete['_first_count'] > 4:
             for event_key in athlete['_first_events'][4:]:
-                prog = COMEN_CUP_FEMALE_PROGRAM if athlete['gender'] == 'F' else COMEN_CUP_MALE_PROGRAM
                 gender_group = females if athlete['gender'] == 'F' else males
-                second = get_second_place_athlete(event_key, gender_group, 'antalya_events_time')
+                second = get_second_place_athlete(event_key, gender_group, 'combined_events_time')
                 if second:
                     second_adds.add(second['athlete_id'])
 
     sel_ids.update(second_adds)
 
+    relay_cand_ids = (
+        _relay_candidate_ids(females, 'combined_events_time', sel_ids, RELAY_LEG_EVENTS_COMEN) |
+        _relay_candidate_ids(males, 'combined_events_time', sel_ids, RELAY_LEG_EVENTS_COMEN)
+    )
+
     for athlete in athletes:
+        athlete['candidate_relay_yildiz_comen_cup_aralik'] = athlete['athlete_id'] in relay_cand_ids
         if athlete['athlete_id'] in sel_ids:
             athlete['selected_yildiz_comen_cup_aralik'] = True
             passes_baraj = any(check_comen_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
@@ -254,19 +441,25 @@ def select_yildizlar_comen_cup_aralik(athletes):
     return athletes
 
 def select_yildizlar_comen_cup_nisan(athletes):
-    """COMEN Nisan: All 1st in program (edirne data). 4+ rule: keep best 4, add 2nd for 5th+."""
+    """COMEN Cup: identical combined-best-result computation as
+    select_yildizlar_comen_cup_aralik() — see that docstring. Kept as a
+    separate function only because the persisted field name
+    (selected_yildiz_comen_cup_nisan) already exists across the codebase;
+    both functions must stay in sync."""
     females = [a for a in athletes if a['gender'] == 'F' and 2011 <= a.get('birth_year') <= 2013]
     males = [a for a in athletes if a['gender'] == 'M' and 2010 <= a.get('birth_year') <= 2012]
 
+    stats_f = _compute_group_stats(females, 'combined_events_time', COMEN_CUP_FEMALE_PROGRAM)
     for athlete in females:
-        first_events = get_first_place_events(athlete['athlete_id'], females, 'edirne_events_time', COMEN_CUP_FEMALE_PROGRAM)
-        athlete['_first_events'] = first_events
-        athlete['_first_count'] = len(first_events)
+        s = stats_f.get(athlete['athlete_id'], {'first_events': [], 'first': 0})
+        athlete['_first_events'] = s['first_events']
+        athlete['_first_count'] = s['first']
 
+    stats_m = _compute_group_stats(males, 'combined_events_time', COMEN_CUP_MALE_PROGRAM)
     for athlete in males:
-        first_events = get_first_place_events(athlete['athlete_id'], males, 'edirne_events_time', COMEN_CUP_MALE_PROGRAM)
-        athlete['_first_events'] = first_events
-        athlete['_first_count'] = len(first_events)
+        s = stats_m.get(athlete['athlete_id'], {'first_events': [], 'first': 0})
+        athlete['_first_events'] = s['first_events']
+        athlete['_first_count'] = s['first']
 
     sel_f = [a for a in females if a['_first_count'] > 0]
     sel_m = [a for a in males if a['_first_count'] > 0]
@@ -278,13 +471,19 @@ def select_yildizlar_comen_cup_nisan(athletes):
         if athlete['_first_count'] > 4:
             for event_key in athlete['_first_events'][4:]:
                 gender_group = females if athlete['gender'] == 'F' else males
-                second = get_second_place_athlete(event_key, gender_group, 'edirne_events_time')
+                second = get_second_place_athlete(event_key, gender_group, 'combined_events_time')
                 if second:
                     second_adds.add(second['athlete_id'])
 
     sel_ids.update(second_adds)
 
+    relay_cand_ids = (
+        _relay_candidate_ids(females, 'combined_events_time', sel_ids, RELAY_LEG_EVENTS_COMEN) |
+        _relay_candidate_ids(males, 'combined_events_time', sel_ids, RELAY_LEG_EVENTS_COMEN)
+    )
+
     for athlete in athletes:
+        athlete['candidate_relay_yildiz_comen_cup_nisan'] = athlete['athlete_id'] in relay_cand_ids
         if athlete['athlete_id'] in sel_ids:
             athlete['selected_yildiz_comen_cup_nisan'] = True
             passes_baraj = any(check_comen_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
@@ -298,32 +497,55 @@ def select_yildizlar_comen_cup_nisan(athletes):
 
     return athletes
 
+CENTRAL_EUROPE_QUOTA = 12
+
+
 def select_yildizlar_central_europe_aralik(athletes):
-    """CENTRAL Aralık: Top 12F+12M in program. If >12 1st places, rank by (1st,2nd,3rd). 4+ rule: add 2nd for 5th+."""
+    """CENTRAL Aralık: quota 12F+12M, same discretionary-pad caveat as
+    Multinations — every real 1st-place winner is 'kesin' (definite)
+    regardless of whether that count is above or below 12; only when there
+    are FEWER than 12 winners are the next-best (2nd/3rd place) athletes
+    flagged as 'aday' (candidate_yildiz_central_europe_aralik), never
+    auto-selected. Relay-leg depth candidates (independent of quota fill)
+    are flagged the same way as Multinations — see RELAY_LEG_EVENTS.
+    4+ rule: an athlete with >4 wins gets kept to 4 individual events; the
+    5th+ event's 2nd-place finisher is invited in their place (rule text
+    uses mandatory "davet edilir", not discretionary — so this IS
+    auto-applied, unlike the quota pad/trim above)."""
     eligible = [a for a in athletes if 2011 <= a.get('birth_year') <= 2013]
     females = [a for a in eligible if a['gender'] == 'F']
     males = [a for a in eligible if a['gender'] == 'M']
 
+    stats_f = _compute_group_stats(females, 'combined_events_time', CENTRAL_FEMALE_PROGRAM)
     for athlete in females:
-        first_events = get_first_place_events(athlete['athlete_id'], females, 'combined_events_time', CENTRAL_FEMALE_PROGRAM)
-        athlete['_first_events'] = first_events
-        athlete['_first'] = len(first_events)
-        athlete['_second'] = count_events_by_rank(athlete['athlete_id'], females, 'combined_events_time', 2, CENTRAL_FEMALE_PROGRAM)
-        athlete['_third'] = count_events_by_rank(athlete['athlete_id'], females, 'combined_events_time', 3, CENTRAL_FEMALE_PROGRAM)
+        s = stats_f.get(athlete['athlete_id'], {'first_events': [], 'first': 0, 'second': 0, 'third': 0})
+        athlete['_first_events'] = s['first_events']
+        athlete['_first'] = s['first']
+        athlete['_second'] = s['second']
+        athlete['_third'] = s['third']
 
+    stats_m = _compute_group_stats(males, 'combined_events_time', CENTRAL_MALE_PROGRAM)
     for athlete in males:
-        first_events = get_first_place_events(athlete['athlete_id'], males, 'combined_events_time', CENTRAL_MALE_PROGRAM)
-        athlete['_first_events'] = first_events
-        athlete['_first'] = len(first_events)
-        athlete['_second'] = count_events_by_rank(athlete['athlete_id'], males, 'combined_events_time', 2, CENTRAL_MALE_PROGRAM)
-        athlete['_third'] = count_events_by_rank(athlete['athlete_id'], males, 'combined_events_time', 3, CENTRAL_MALE_PROGRAM)
+        s = stats_m.get(athlete['athlete_id'], {'first_events': [], 'first': 0, 'second': 0, 'third': 0})
+        athlete['_first_events'] = s['first_events']
+        athlete['_first'] = s['first']
+        athlete['_second'] = s['second']
+        athlete['_third'] = s['third']
 
-    females.sort(key=lambda x: (x['_first'], x['_second'], x['_third']), reverse=True)
-    males.sort(key=lambda x: (x['_first'], x['_second'], x['_third']), reverse=True)
+    def select_group(group):
+        with_first = [a for a in group if a.get('_first', 0) > 0]
+        without_first = [a for a in group if a.get('_first', 0) == 0]
+        candidates = []
+        if len(with_first) < CENTRAL_EUROPE_QUOTA:
+            without_first.sort(key=lambda x: (x.get('_second', 0), x.get('_third', 0)), reverse=True)
+            pool = without_first[:CENTRAL_EUROPE_QUOTA - len(with_first)]
+            candidates = [a for a in pool if a.get('_second', 0) > 0 or a.get('_third', 0) > 0]
+        return with_first, candidates
 
-    sel_f = females[:12]
-    sel_m = males[:12]
+    sel_f, cand_f = select_group(females)
+    sel_m, cand_m = select_group(males)
     sel_ids = {a['athlete_id'] for a in sel_f + sel_m}
+    cand_ids = {a['athlete_id'] for a in cand_f + cand_m}
     second_adds = set()
 
     for athlete in sel_f + sel_m:
@@ -335,15 +557,29 @@ def select_yildizlar_central_europe_aralik(athletes):
                     second_adds.add(second['athlete_id'])
 
     sel_ids.update(second_adds)
+    cand_ids -= sel_ids
+
+    relay_cand_ids = (
+        _relay_candidate_ids(females, 'combined_events_time', sel_ids) |
+        _relay_candidate_ids(males, 'combined_events_time', sel_ids)
+    )
 
     for athlete in athletes:
-        if athlete['athlete_id'] in sel_ids:
+        aid = athlete['athlete_id']
+        athlete['candidate_relay_yildiz_central_europe_aralik'] = aid in relay_cand_ids
+        if aid in sel_ids:
             athlete['selected_yildiz_central_europe_aralik'] = True
+            athlete['candidate_yildiz_central_europe_aralik'] = False
             passes_baraj = any(check_central_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
                              for (s, d) in athlete.get('combined_events', {}))
             athlete['coach_called_yildiz_central_europe_aralik'] = passes_baraj
+        elif aid in cand_ids:
+            athlete['selected_yildiz_central_europe_aralik'] = False
+            athlete['candidate_yildiz_central_europe_aralik'] = True
+            athlete['coach_called_yildiz_central_europe_aralik'] = False
         else:
             athlete['selected_yildiz_central_europe_aralik'] = False
+            athlete['candidate_yildiz_central_europe_aralik'] = False
             athlete['coach_called_yildiz_central_europe_aralik'] = False
         for k in ['_first_events', '_first', '_second', '_third']:
             athlete.pop(k, None)
@@ -356,26 +592,36 @@ def select_yildizlar_central_europe_nisan(athletes):
     females = [a for a in eligible if a['gender'] == 'F']
     males = [a for a in eligible if a['gender'] == 'M']
 
+    stats_f = _compute_group_stats(females, 'combined_events_time', CENTRAL_FEMALE_PROGRAM)
     for athlete in females:
-        first_events = get_first_place_events(athlete['athlete_id'], females, 'combined_events_time', CENTRAL_FEMALE_PROGRAM)
-        athlete['_first_events'] = first_events
-        athlete['_first'] = len(first_events)
-        athlete['_second'] = count_events_by_rank(athlete['athlete_id'], females, 'combined_events_time', 2, CENTRAL_FEMALE_PROGRAM)
-        athlete['_third'] = count_events_by_rank(athlete['athlete_id'], females, 'combined_events_time', 3, CENTRAL_FEMALE_PROGRAM)
+        s = stats_f.get(athlete['athlete_id'], {'first_events': [], 'first': 0, 'second': 0, 'third': 0})
+        athlete['_first_events'] = s['first_events']
+        athlete['_first'] = s['first']
+        athlete['_second'] = s['second']
+        athlete['_third'] = s['third']
 
+    stats_m = _compute_group_stats(males, 'combined_events_time', CENTRAL_MALE_PROGRAM)
     for athlete in males:
-        first_events = get_first_place_events(athlete['athlete_id'], males, 'combined_events_time', CENTRAL_MALE_PROGRAM)
-        athlete['_first_events'] = first_events
-        athlete['_first'] = len(first_events)
-        athlete['_second'] = count_events_by_rank(athlete['athlete_id'], males, 'combined_events_time', 2, CENTRAL_MALE_PROGRAM)
-        athlete['_third'] = count_events_by_rank(athlete['athlete_id'], males, 'combined_events_time', 3, CENTRAL_MALE_PROGRAM)
+        s = stats_m.get(athlete['athlete_id'], {'first_events': [], 'first': 0, 'second': 0, 'third': 0})
+        athlete['_first_events'] = s['first_events']
+        athlete['_first'] = s['first']
+        athlete['_second'] = s['second']
+        athlete['_third'] = s['third']
 
-    females.sort(key=lambda x: (x['_first'], x['_second'], x['_third']), reverse=True)
-    males.sort(key=lambda x: (x['_first'], x['_second'], x['_third']), reverse=True)
+    def select_group(group):
+        with_first = [a for a in group if a.get('_first', 0) > 0]
+        without_first = [a for a in group if a.get('_first', 0) == 0]
+        candidates = []
+        if len(with_first) < CENTRAL_EUROPE_QUOTA:
+            without_first.sort(key=lambda x: (x.get('_second', 0), x.get('_third', 0)), reverse=True)
+            pool = without_first[:CENTRAL_EUROPE_QUOTA - len(with_first)]
+            candidates = [a for a in pool if a.get('_second', 0) > 0 or a.get('_third', 0) > 0]
+        return with_first, candidates
 
-    sel_f = females[:12]
-    sel_m = males[:12]
+    sel_f, cand_f = select_group(females)
+    sel_m, cand_m = select_group(males)
     sel_ids = {a['athlete_id'] for a in sel_f + sel_m}
+    cand_ids = {a['athlete_id'] for a in cand_f + cand_m}
     second_adds = set()
 
     for athlete in sel_f + sel_m:
@@ -387,109 +633,55 @@ def select_yildizlar_central_europe_nisan(athletes):
                     second_adds.add(second['athlete_id'])
 
     sel_ids.update(second_adds)
+    cand_ids -= sel_ids
+
+    relay_cand_ids = (
+        _relay_candidate_ids(females, 'combined_events_time', sel_ids) |
+        _relay_candidate_ids(males, 'combined_events_time', sel_ids)
+    )
 
     for athlete in athletes:
-        if athlete['athlete_id'] in sel_ids:
+        aid = athlete['athlete_id']
+        athlete['candidate_relay_yildiz_central_europe_nisan'] = aid in relay_cand_ids
+        if aid in sel_ids:
             athlete['selected_yildiz_central_europe_nisan'] = True
+            athlete['candidate_yildiz_central_europe_nisan'] = False
             passes_baraj = any(check_central_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
                              for (s, d) in athlete.get('combined_events', {}))
             athlete['coach_called_yildiz_central_europe_nisan'] = passes_baraj
+        elif aid in cand_ids:
+            athlete['selected_yildiz_central_europe_nisan'] = False
+            athlete['candidate_yildiz_central_europe_nisan'] = True
+            athlete['coach_called_yildiz_central_europe_nisan'] = False
         else:
             athlete['selected_yildiz_central_europe_nisan'] = False
+            athlete['candidate_yildiz_central_europe_nisan'] = False
             athlete['coach_called_yildiz_central_europe_nisan'] = False
         for k in ['_first_events', '_first', '_second', '_third']:
             athlete.pop(k, None)
 
     return athletes
 
-def select_federasyon_karma(athletes):
-    """Select federasyon karma from athletes NOT selected to Multi/COMEN/CENTRAL.
-
-    Rule: "Federasyon karması kuralları. Kadro, Multinations-Comen-Central European Yıldızlar
-    Milli Takımlarının ana kadrosuna giremeyen sporculardan seçilecektir."
-
-    Selection by birth year + region + gender:
-    - 13 yaş (2013): 1. Bölge 6F+6M, 2-6. Bölgeler 3F+3M
-    - 14 yaş (2012): 1. Bölge 4F+4M, 2-6. Bölgeler 2F+2M
-    - 15 yaş (2011): 1. Bölge 2F+2M, 2-6. Bölgeler 1F+1M
-    """
-    REGION_QUOTAS = {
-        2013: {1: (6, 6), 2: (3, 3), 3: (3, 3), 4: (3, 3), 5: (3, 3), 6: (3, 3)},
-        2012: {1: (4, 4), 2: (2, 2), 3: (2, 2), 4: (2, 2), 5: (2, 2), 6: (2, 2)},
-        2011: {1: (2, 2), 2: (1, 1), 3: (1, 1), 4: (1, 1), 5: (1, 1), 6: (1, 1)},
-    }
-
-    # Find athletes NOT selected to any yıldızlar competition
-    not_selected = []
-    for a in athletes:
-        is_multi = a.get('selected_yildiz_multinations', False)
-        is_comen = a.get('selected_yildiz_comen_cup_aralik', False) or a.get('selected_yildiz_comen_cup_nisan', False)
-        is_central = a.get('selected_yildiz_central_europe_aralik', False) or a.get('selected_yildiz_central_europe_nisan', False)
-
-        if not (is_multi or is_comen or is_central):
-            not_selected.append(a)
-
-    # Group by birth_year and region
-    for birth_year in [2013, 2012, 2011]:
-        year_athletes = [a for a in not_selected if a.get('birth_year') == birth_year]
-        quotas = REGION_QUOTAS.get(birth_year, {})
-
-        for region in range(1, 7):  # 6 regions
-            region_athletes = [a for a in year_athletes if a.get('region') == region]
-            quota_f, quota_m = quotas.get(region, (0, 0))
-
-            if not region_athletes:
-                continue
-
-            # Separate by gender and rank by 1st place count
-            females = [a for a in region_athletes if a['gender'] == 'F']
-            males = [a for a in region_athletes if a['gender'] == 'M']
-
-            # Count first places using combined_events_time
-            eligible = [x for x in athletes if x.get('birth_year') == birth_year and x.get('region') == region]
-
-            for a in females:
-                same_gender = [x for x in eligible if x['gender'] == 'F']
-                a['_karma_first_count'] = count_first_places(a['athlete_id'], same_gender, 'combined_events_time')
-
-            for a in males:
-                same_gender = [x for x in eligible if x['gender'] == 'M']
-                a['_karma_first_count'] = count_first_places(a['athlete_id'], same_gender, 'combined_events_time')
-
-            # Sort by first count desc, then name (tiebreaker)
-            females.sort(key=lambda a: (-a.get('_karma_first_count', 0), a['athlete_name']))
-            males.sort(key=lambda a: (-a.get('_karma_first_count', 0), a['athlete_name']))
-
-            # Select top N per gender by quota
-            for i, female in enumerate(females[:quota_f]):
-                field_name = f'selected_federasyon_karma_b{region}'
-                female[field_name] = True
-                female['selected_slot'] = f'B{region}-{i+1}'
-
-            for i, male in enumerate(males[:quota_m]):
-                field_name = f'selected_federasyon_karma_b{region}'
-                male[field_name] = True
-                male['selected_slot'] = f'B{region}-{i+1}'
-
-    # Cleanup temp fields
-    for a in athletes:
-        a.pop('_karma_first_count', None)
-
-    return athletes
-
 def select_all_yildizlar(athletes):
-    """Apply all selections.
+    """Apply the three independent Yıldızlar competition selections
+    (Multinations, COMEN, CENTRAL). Athletes can be selected for multiple
+    competitions based on their performance.
 
-    Three independent competitions (Multinations, COMEN, CENTRAL).
-    Athletes can be selected for multiple competitions based on their performance.
-    Federasyon karma: athletes NOT selected to Multi/COMEN/CENTRAL
+    Federasyon Karması (TR-*/B*-* point-based ranking, excluding athletes
+    selected here) is computed separately by
+    panel.serve.apply_selection_status_with_points() — it is NOT part of
+    this function. It used to be (via select_federasyon_karma(), now
+    removed): that version ranked by first-place count instead of the
+    federation's actual point-based top-3 rule, and it overwrote
+    selected_slot after rank_group() had already set it correctly, producing
+    inconsistent selected/selected_slot pairs (e.g. selected='TR' with
+    selected_slot='B2-1'). See FEDERASYON-KARMASI-TAKIM-SECILME-KRITERLERI.md.
     """
     athletes = select_yildizlar_multinations(athletes)
     athletes = select_yildizlar_comen_cup_aralik(athletes)
     athletes = select_yildizlar_comen_cup_nisan(athletes)
     athletes = select_yildizlar_central_europe_aralik(athletes)
     athletes = select_yildizlar_central_europe_nisan(athletes)
-    athletes = select_federasyon_karma(athletes)
 
     logger.info(f"Yıldızlar selection complete: {len(athletes)} athletes")
     return athletes
