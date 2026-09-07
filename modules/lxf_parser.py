@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from typing import List, Dict, Optional
 from datetime import datetime
 from modules.m4_mapping import lookup_club
+from modules.plate_region import plate_to_region, plate_to_province
 from config import STROKE_MAP
 
 
@@ -57,6 +58,11 @@ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
                 for club_elem in clubs:
                     club_id = club_elem.get('clubid')
                     club_name = club_elem.get('clubname') or club_elem.get('name')
+                    # CLUB düğümü kulüpsüz ("Ferdi") sporcular için ili plaka
+                    # kodu olarak taşır (region="07" = Antalya). Excel kulüp
+                    # haritası tutmazsa bunu fallback olarak kullanacağız.
+                    club_region_code = club_elem.get('region')
+                    club_nation = club_elem.get('nation')
                     athletes_in_club = club_elem.findall('.//ATHLETE')
                     for athlete_in_club in athletes_in_club:
                         athlete_id = athlete_in_club.get('athleteid')
@@ -64,6 +70,8 @@ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
                             club_by_athlete[athlete_id] = {
                                 'club_id': club_id,
                                 'club_name': club_name,
+                                'club_region_code': club_region_code,
+                                'nation': club_nation,
                             }
 
                 # Parse athletes
@@ -85,14 +93,20 @@ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
                     }
 
                     # Get club info if available (direct child CLUB element)
+                    club_region_code = None
+                    club_nation = None
                     club_elem = athlete_elem.find('.//CLUB')
                     if club_elem is not None:
                         athlete['club_id'] = club_elem.get('clubid')
-                        athlete['club_name'] = club_elem.get('clubname')
+                        athlete['club_name'] = club_elem.get('clubname') or club_elem.get('name')
+                        club_region_code = club_elem.get('region')
+                        club_nation = club_elem.get('nation')
                     # Or from parent CLUB element (some LXF formats)
                     elif athlete_id in club_by_athlete:
                         athlete['club_id'] = club_by_athlete[athlete_id]['club_id']
                         athlete['club_name'] = club_by_athlete[athlete_id]['club_name']
+                        club_region_code = club_by_athlete[athlete_id].get('club_region_code')
+                        club_nation = club_by_athlete[athlete_id].get('nation')
 
                     # Look up city/region from Excel mapping
                     if athlete['club_name']:
@@ -100,6 +114,16 @@ def parse_lxf_file(file_path: str) -> tuple[List[Dict], List[Dict]]:
                         if mapping:
                             athlete['city'] = mapping['city']
                             athlete['region'] = mapping['region']
+
+                    # Fallback for kulüpsüz ("Ferdi") sporcular: Excel haritası
+                    # tutmadıysa CLUB düğümünün plaka kodundan il/bölge çıkar.
+                    # Sadece Türk sporcular için (nation boş ya da "TUR").
+                    if athlete['region'] == 0 and (club_nation or 'TUR').upper() == 'TUR':
+                        region_from_plate = plate_to_region(club_region_code)
+                        if region_from_plate:
+                            athlete['region'] = region_from_plate
+                            if athlete['city'] == 'Unknown':
+                                athlete['city'] = plate_to_province(club_region_code) or 'Unknown'
 
                     athletes_list.append(athlete)
 

@@ -583,12 +583,28 @@ def batch_insert_fed_results(results_list: list) -> int:
         conn.execute("BEGIN TRANSACTION")
         count = 0
         for result_dict in results_list:
+            # ux_fed_results (race_leg, athlete_name, birth_year, stroke, distance)
+            # UNIQUE. LXF'te aynı branş için seri + final ayrı RESULT satırı
+            # gelir — çakışmada en HIZLI dereceyi tut, geri kalanı yok say.
             conn.execute("""
                 INSERT INTO fed_results (
                     race_leg, race_date, athlete_name, birth_year, gender,
                     region, city, club, stroke, distance,
                     time_text, time_seconds, points, source_pdf_seq
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (race_leg, athlete_name, birth_year, stroke, distance)
+                DO UPDATE SET
+                    time_text    = excluded.time_text,
+                    time_seconds = excluded.time_seconds,
+                    race_date    = excluded.race_date,
+                    region       = excluded.region,
+                    city         = excluded.city,
+                    club         = excluded.club,
+                    points       = excluded.points,
+                    source_pdf_seq = excluded.source_pdf_seq
+                WHERE excluded.time_seconds IS NOT NULL
+                  AND (fed_results.time_seconds IS NULL
+                       OR excluded.time_seconds < fed_results.time_seconds)
             """, (
                 result_dict.get('race_leg', 'antalya'),
                 result_dict.get('race_date'),
