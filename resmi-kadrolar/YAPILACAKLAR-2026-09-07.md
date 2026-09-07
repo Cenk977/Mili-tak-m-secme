@@ -56,5 +56,38 @@ Gerçek TYF verisiyle doğrulandı — resmi kadroyla eşleşti:
 - **2012F Bölge3**: Merve Mengüberti (ferdi İzmir) B3-1 girdi.
 - (Talya Tok bu veride puanlanabilir yarışa sahip değil → seçilmedi, ayrı durum.)
 
-Testler: 109/109 pytest. Kalan gerçek tie vakaları (2013E B1 vb.) ve "Soru 1"
-(tam puan eşitliğinde 4.-5.-6. yarış tiebreak) hâlâ açık.
+Testler: 109/109 pytest.
+
+## 2026-09-07 (2. oturum) — SORU 1 ÇÖZÜLDÜ: 50m kısıtının kapsamı
+
+`best_scores_sequence` "en fazla 1 adet 50m" kısıtını **tüm sıralama
+dizisine** uyguluyordu → sporcunun ikinci 50m yarışı eşitlik-bozma
+(4./5./6. yarış) sırasında da yok sayılıyordu. PDF kuralı kısıtı yalnızca
+"puan aldıkları **3 yarış**" için koyuyor. Commit d398b70.
+
+Düzeltme: top3 hâlâ max 1x50m; 4. yarıştan itibaren kalan tüm yarışlar
+(ek 50m dahil) puana göre. top3 üçü dolduramazsa 0 padlenir.
+
+Vaka — **2012 Erkek TR-10**: Kaan Balta (Kelebek50=7 + Serbest50=7 +
+Serbest100=9 + Serbest200=7 → top3=23, top4=30) vs Doruk Efe Donbaycı
+(top3=23, top4=29). Artık Kaan, Doruk'un önünde → **TR-10 = Kaan Balta**,
+resmi kadroyla **2012E TR 10/10 tam eşleşme**. 2013 K/E TR hâlâ 20/20
+(regresyon yok). Testler: 114/114.
+
+Bunun yan etkisi: 2012E Bölge4'te Doruk artık Bölge'ye düşüyor
+(Doruk+Tan seçili, kota 2). Resmi kadroda 3. isim Umut Ata Sarıkaya(20)
+var — o da kota sınırının altında → "Soru 2" (federasyon takdiri)
+sınıfına giriyor, ayrı bir hata değil.
+
+## Kalan açık noktalar
+
+- **Soru 2 (federasyon takdiri)**: 3 grupta resmi kadro kotayı aşıyor,
+  fazladan çağrılanlar kota sınırının ALTINDA ve sınırla eşit değil:
+  - 2013E B1: Burak Kabaoğlu(21), Levent Yıldız(21) — sınır 22
+  - 2013E B4: Ahmet Tuna Atcı(21), Barış Atakan Güvenç(21) — sınır 22 (Ankara, kullanıcı onayladı: kod değişmeyecek)
+  - 2013K B6: Ömür Güvel(20) — sınır 21
+  - 2012E B4: Umut Ata Sarıkaya(20) — sınır 23
+  Yazılı PDF kuralında karşılığı yok; wildcard/takdir görünüyor. Kod değişmeyecek.
+- **2012K B3 veri sorunu**: Resmi B3'te Talya Tok(14) var ama elimizdeki
+  Antalya+Edirne LXF'inde Talya Tok'un puanlanabilir yarışı yok (top3=0),
+  yerine Tusem Anastasiya Aşkar(14) seçiliyor. Kural değil, eksik veri.
