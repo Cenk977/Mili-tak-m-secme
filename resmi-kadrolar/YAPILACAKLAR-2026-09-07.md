@@ -88,6 +88,22 @@ sınıfına giriyor, ayrı bir hata değil.
   - 2013K B6: Ömür Güvel(20) — sınır 21
   - 2012E B4: Umut Ata Sarıkaya(20) — sınır 23
   Yazılı PDF kuralında karşılığı yok; wildcard/takdir görünüyor. Kod değişmeyecek.
-- **2012K B3 veri sorunu**: Resmi B3'te Talya Tok(14) var ama elimizdeki
-  Antalya+Edirne LXF'inde Talya Tok'un puanlanabilir yarışı yok (top3=0),
-  yerine Tusem Anastasiya Aşkar(14) seçiliyor. Kural değil, eksik veri.
+- ~~**2012K B3 veri sorunu**: Talya Tok top3=0~~ **ÇÖZÜLDÜ (commit 27a6068).**
+  Gerçek neden: Talya, 50m Kelebek'te 2011-2013K havuzunda en hızlı (28.36)
+  olduğu için branş birincisi = kesin Multinations sayılıp Fed Karması'ndan
+  dışlanıyordu. 2011-2013K'da 11 branş birincisi var, kota 10. PDF madde 5:
+  kota aşımında (1.lik,2.lik,3.lük) sayısına göre kotaya indirilir. Talya'nın
+  hiç 2./3.lüğü yok → en zayıf → ADAY'a düştü, Fed Karması'na girdi → 2012K
+  B3-2 (resmi kadroyla eşleşti). Multinations F artık 10/10 resmi.
+
+## Multinations/Central madde-5 kırpması (27a6068)
+
+`_split_winners_by_quota()` — branş birincisi sayısı kotadan fazlaysa
+(Multi 10, Central 12) `(1.lik, 2.lik, 3.lük)` azalan sıralanıp kotaya
+indirilir; altta kalan birinciler ADAY (`candidate_yildiz_*`), otomatik
+seçilmez ve Federasyon Karması'ndan dışlanmaz. `< kota` (madde 4 dolgusu)
+ve `== kota` davranışı değişmedi. Comen'de kota yok, dokunulmadı.
+
+Not: Eşitlikte sınırdaki kişi(ler) — şu an tam kotaya kesiliyor (kararlı
+sıralama, giriş sırası korunur). Federasyonun eşitlik davranışı belirsiz;
+kullanıcı bir sorun bildirirse "tied-keep" eklenebilir.
