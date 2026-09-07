@@ -39,3 +39,22 @@ Bu oturumda Multinations, Comen Cup, Central European ve Federasyon Karması sis
 8. `region` filtresinin TR (ulusal) sıralamasını bölge-içi sıralamaya indirgemesi (birth_year pooling bug'ının ikizi) — düzeltildi.
 
 Tüm düzeltmeler test edildi (104/104 pytest), gerçek TYF verisiyle çapraz kontrol edildi.
+
+## 2026-09-07 (2. oturum) — Soru 2'nin büyük kısmı ÇÖZÜLDÜ: ferdi sporcu bug'ı
+
+Yukarıdaki "Soru 2" (kota aşımı) vakalarının çoğu tie mantığı değil, **ferdi
+(kulüpsüz) sporcuların bölgesiz kalmasıydı**. LXF'te `<CLUB name="Ferdi" ...>`
+düğümü Excel kulüp haritasında olmadığı için parser `region=0`/`city=Unknown`
+bırakıyordu; bu sporcular hiçbir bölge sıralamasına girmiyor, yerlerine
+kotadan taşan başkaları seçiliyordu. CLUB düğümü ili plaka kodu olarak taşıyor
+(`region="07"` = Antalya) — artık `modules/plate_region.py` ile plaka→bölge/il
+fallback'i var (81/81 il, Excel il→bölge verisinden üretildi). Commit e1651fa.
+
+Gerçek TYF verisiyle doğrulandı — resmi kadroyla eşleşti:
+- **2013F Bölge3**: Aliye Pazar (ferdi Antalya) B3-2 girdi; kota 3'e döndü (önceden 4 kişi seçiliyordu, Ada Güngör + Derin Alya Kalak fazlalıktı).
+- **2013E Bölge3**: Uras Güneş (ferdi Antalya) girdi, Eren Ayaz çıktı — bu notun tam dediği.
+- **2012F Bölge3**: Merve Mengüberti (ferdi İzmir) B3-1 girdi.
+- (Talya Tok bu veride puanlanabilir yarışa sahip değil → seçilmedi, ayrı durum.)
+
+Testler: 109/109 pytest. Kalan gerçek tie vakaları (2013E B1 vb.) ve "Soru 1"
+(tam puan eşitliğinde 4.-5.-6. yarış tiebreak) hâlâ açık.
