@@ -123,11 +123,17 @@ def best_scores_sequence(event_scores: dict[tuple, int]) -> list[int]:
       - top3_total = sum(seq[:3])
       - tiebreaker: seq[3], seq[4], ...
 
-    Algoritma (greedy):
-      - 50m branşları ayrı, 50m olmayan branşlar ayrı sıralanır
-      - 50m listesinden sadece en iyisi kullanılabilir
-      - Her adımda: bir sonraki 50m ile bir sonraki non-50m karşılaştır,
-        büyük olanı al (50m kotası aşılmadan)
+    "max 1 adet 50m" kısıtı YALNIZCA puanlanan ilk 3 yarışa uygulanır
+    (PDF: "puan aldıkları 3 yarış içerisinde en fazla 1 adet 50 metrelik
+    mesafe bulunabilir"). Eşitlik-bozma için bakılan 4./5./6. yarışta
+    sporcunun ikinci/üçüncü 50m yarışı da sayılır.
+
+    Algoritma:
+      - 50m ve 50m-olmayan branşlar ayrı sıralanır.
+      - İlk 3: greedy merge, en fazla 1 adet 50m alınır. 3'ü dolduramazsa
+        (yeterli 50m-olmayan yarış yoksa) eksik kalır, 0 ile padlenir —
+        böylece sum(seq[:3]) kısıtlı top3'ü verir.
+      - 4. ve sonrası: kalan tüm yarışlar (ek 50m dahil) puana göre.
     """
     fifties = sorted(
         [p for (s, d), p in event_scores.items() if d == 50 and p > 0],
@@ -138,25 +144,27 @@ def best_scores_sequence(event_scores: dict[tuple, int]) -> list[int]:
         reverse=True
     )
 
-    best_50 = fifties[0] if fifties else 0
-    result: list[int] = []
+    top3: list[int] = []
     used_50 = False
-    i = 0
+    fi = 0   # tüketilen 50m sayısı (top3 içinde 0 veya 1)
+    ni = 0   # tüketilen 50m-olmayan sayısı
 
-    while True:
-        nf = non_fifties[i] if i < len(non_fifties) else -1
-        f  = best_50 if not used_50 else -1
-
-        if nf < 0 and f < 0:
+    while len(top3) < 3:
+        f  = fifties[0] if (not used_50 and fifties) else -1
+        nf = non_fifties[ni] if ni < len(non_fifties) else -1
+        if f < 0 and nf < 0:
             break
         if f > nf:
-            result.append(f)
+            top3.append(f)
             used_50 = True
+            fi = 1
         else:
-            result.append(nf)
-            i += 1
+            top3.append(nf)
+            ni += 1
 
-    return result
+    rest = sorted(fifties[fi:] + non_fifties[ni:], reverse=True)
+
+    return top3 + [0] * (3 - len(top3)) + rest
 
 
 def compute_top3_total(event_scores: dict[tuple, int]) -> int:
