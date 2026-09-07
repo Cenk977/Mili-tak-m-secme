@@ -294,6 +294,41 @@ def count_first_places(athlete_id: int, eligible_athletes: list, event_times_key
 MULTINATIONS_QUOTA = 10
 
 
+def _split_winners_by_quota(with_first, without_first, quota):
+    """Multinations / Central European kota mantığı (PDF madde 4 + 5).
+
+      - branş birincisi sayısı > kota → madde 5: (1.lik, 2.lik, 3.lük)
+        sayısına göre azalan sırala, ilk `quota` kişi KESİN, gerisi ADAY.
+        (Deterministik; federasyonun "2. ve 3.lüklere bakılır" ifadesi.)
+      - branş birincisi sayısı < kota → madde 4: 2./3.lük sahiplerinden
+        en iyileri ADAY olarak eklenir (otomatik seçilmez).
+      - tam kotada → herkes KESİN.
+
+    `sorted` kararlıdır; eşit anahtarlarda giriş sırası korunur
+    (get_athlete_rankings satırları id'ye göre sıraladığı için deterministik).
+
+    Döner: (selected, candidates)
+    """
+    if len(with_first) > quota:
+        ranked = sorted(
+            with_first,
+            key=lambda a: (a.get('_first', 0), a.get('_second', 0), a.get('_third', 0)),
+            reverse=True,
+        )
+        return ranked[:quota], ranked[quota:]
+
+    if len(with_first) < quota:
+        pool = sorted(
+            without_first,
+            key=lambda a: (a.get('_second', 0), a.get('_third', 0)),
+            reverse=True,
+        )[:quota - len(with_first)]
+        return with_first, [a for a in pool
+                            if a.get('_second', 0) > 0 or a.get('_third', 0) > 0]
+
+    return with_first, []
+
+
 def select_yildizlar_multinations(athletes):
     """Multinations: quota is 10F+10M, but per the rule text the squad is
     only padded to quota — or trimmed below it — "Türkiye Yüzme Federasyonu
@@ -329,12 +364,7 @@ def select_yildizlar_multinations(athletes):
     def select_group(group):
         with_first = [a for a in group if a.get('_first', 0) > 0]
         without_first = [a for a in group if a.get('_first', 0) == 0]
-        candidates = []
-        if len(with_first) < MULTINATIONS_QUOTA:
-            without_first.sort(key=lambda x: (x.get('_second', 0), x.get('_third', 0)), reverse=True)
-            pool = without_first[:MULTINATIONS_QUOTA - len(with_first)]
-            candidates = [a for a in pool if a.get('_second', 0) > 0 or a.get('_third', 0) > 0]
-        return with_first, candidates
+        return _split_winners_by_quota(with_first, without_first, MULTINATIONS_QUOTA)
 
     sel_f, cand_f = select_group(females)
     sel_m, cand_m = select_group(males)
@@ -535,12 +565,7 @@ def select_yildizlar_central_europe_aralik(athletes):
     def select_group(group):
         with_first = [a for a in group if a.get('_first', 0) > 0]
         without_first = [a for a in group if a.get('_first', 0) == 0]
-        candidates = []
-        if len(with_first) < CENTRAL_EUROPE_QUOTA:
-            without_first.sort(key=lambda x: (x.get('_second', 0), x.get('_third', 0)), reverse=True)
-            pool = without_first[:CENTRAL_EUROPE_QUOTA - len(with_first)]
-            candidates = [a for a in pool if a.get('_second', 0) > 0 or a.get('_third', 0) > 0]
-        return with_first, candidates
+        return _split_winners_by_quota(with_first, without_first, CENTRAL_EUROPE_QUOTA)
 
     sel_f, cand_f = select_group(females)
     sel_m, cand_m = select_group(males)
@@ -611,12 +636,7 @@ def select_yildizlar_central_europe_nisan(athletes):
     def select_group(group):
         with_first = [a for a in group if a.get('_first', 0) > 0]
         without_first = [a for a in group if a.get('_first', 0) == 0]
-        candidates = []
-        if len(with_first) < CENTRAL_EUROPE_QUOTA:
-            without_first.sort(key=lambda x: (x.get('_second', 0), x.get('_third', 0)), reverse=True)
-            pool = without_first[:CENTRAL_EUROPE_QUOTA - len(with_first)]
-            candidates = [a for a in pool if a.get('_second', 0) > 0 or a.get('_third', 0) > 0]
-        return with_first, candidates
+        return _split_winners_by_quota(with_first, without_first, CENTRAL_EUROPE_QUOTA)
 
     sel_f, cand_f = select_group(females)
     sel_m, cand_m = select_group(males)
