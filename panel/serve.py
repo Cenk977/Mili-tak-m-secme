@@ -654,8 +654,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             t1 = time.time()
             athletes = select_all_yildizlar(athletes)
             athletes = select_all_gencler(athletes)
-            timing['yildizlar'] = time.time() - t1
-            logger.info(f"API /ranking: select_all_yildizlar took {timing['yildizlar']:.2f}s")
+            timing['selections'] = time.time() - t1
+            logger.info(f"API /ranking: select_all_yildizlar+gencler took {timing['selections']:.2f}s")
 
             # **Filter by leg/birth_year/region** for display only, now that
             # every selection has been computed on the full pool.
@@ -804,7 +804,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             timing['json_response'] = time.time() - t1
 
             total_time = time.time() - start_time
-            logger.info(f"API /api/ranking TOTAL: {total_time:.2f}s | get_rankings={timing.get('get_rankings', 0):.2f}s | filter={timing.get('filter_by_leg', 0):.2f}s | selection={timing.get('selection_status', 0):.2f}s | yildizlar={timing.get('yildizlar', 0):.2f}s | json={timing.get('json_response', 0):.2f}s")
+            logger.info(f"API /api/ranking TOTAL: {total_time:.2f}s | get_rankings={timing.get('get_rankings', 0):.2f}s | filter={timing.get('filter_by_leg', 0):.2f}s | selection={timing.get('selection_status', 0):.2f}s | selections={timing.get('selections', 0):.2f}s | json={timing.get('json_response', 0):.2f}s")
 
         except Exception as e:
             logger.error(f"Error in /api/ranking: {e}", exc_info=True)

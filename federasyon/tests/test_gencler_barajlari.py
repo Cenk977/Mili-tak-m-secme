@@ -49,6 +49,14 @@ def test_passes_any_true_when_one_event_passes():
     assert passes_any(AVRUPA_GENCLER_SPORCU, athlete) is True
 
 
+def test_malformed_baraj_literal_rejects_even_fast_time():
+    # Deliberately malformed baraj string -> parse_time returns inf.
+    # A very fast athlete time must still NOT pass (no fail-open).
+    bad_table = {("Serbest", 50): {"M": "2:60.x", "F": "25,81"}}
+    assert check_baraj(bad_table, "Serbest", 50, "F", "00:00:10.00") is False
+    assert check_baraj(bad_table, "Serbest", 50, "M", "00:00:01.00") is False
+
+
 def test_passes_any_false_when_none_pass():
     athlete = {
         "gender": "F",

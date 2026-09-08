@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from federasyon.gencler_ranker import select_multinations_gencler, MULTI_GENCLER_QUOTA
+from federasyon.gencler_ranker import (
+    select_multinations_gencler, select_all_gencler, MULTI_GENCLER_QUOTA,
+)
 from federasyon.yildizlar_ranker import YILDIZLAR_MALE_PROGRAM, select_yildizlar_multinations
 
 
@@ -53,3 +55,33 @@ def test_yildizlar_multinations_unaffected_by_gencler_call():
     select_multinations_gencler(ath)
     select_yildizlar_multinations(ath)
     assert ath[0]["selected_yildiz_multinations"] is True
+
+
+def _dual_eligible_athlete():
+    # 2012 -> eligible for BOTH Yıldızlar Multinations (2011-2013) and
+    # Avrupa Gençler (2008-2012). Dominant ("Serbest", 50) time:
+    #  - sole competitor -> Multinations branş birincisi
+    #  - 24.00 <= Avrupa Gençler SPORCU F 50 Serbest baraj (25.81)
+    return {
+        "athlete_id": "dual", "athlete_name": "dual", "gender": "F",
+        "birth_year": 2012,
+        "antalya_events_time": {("Serbest", 50): "00:00:24.00"},
+        "combined_events": {("Serbest", 50): 1},
+        "combined_events_time": {("Serbest", 50): "00:00:24.00"},
+    }
+
+
+def test_dual_eligible_no_cross_exclusion_both_orders():
+    # yıldızlar -> gençler
+    ath = [_dual_eligible_athlete()]
+    select_yildizlar_multinations(ath)
+    select_all_gencler(ath)
+    assert ath[0]["selected_yildiz_multinations"] is True
+    assert ath[0]["selected_avrupa_gencler"] is True
+
+    # gençler -> yıldızlar (reverse order preserves both)
+    ath = [_dual_eligible_athlete()]
+    select_all_gencler(ath)
+    select_yildizlar_multinations(ath)
+    assert ath[0]["selected_yildiz_multinations"] is True
+    assert ath[0]["selected_avrupa_gencler"] is True

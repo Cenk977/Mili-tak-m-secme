@@ -79,7 +79,10 @@ def check_baraj(table, stroke, distance, gender, time_str):
     baraj = row.get(gender)
     if baraj is None or not time_str or time_str == "-":
         return False
-    return parse_time(time_str) <= parse_time(baraj)
+    baraj_sec = parse_time(baraj)
+    if baraj_sec == float('inf'):
+        return False
+    return parse_time(time_str) <= baraj_sec
 
 
 def passes_any(table, athlete, event_times_key="combined_events_time"):
