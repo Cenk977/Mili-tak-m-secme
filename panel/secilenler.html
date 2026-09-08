@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seçilen Sporcular — Milli Takım Seçme 2026</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+         background: #f4f5f7; color: #1a1a1a; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  header.page { display: flex; align-items: baseline; justify-content: space-between;
+                flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+  header.page h1 { font-size: 20px; margin: 0; }
+  header.page a { font-size: 13px; color: #667eea; text-decoration: none; }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin: 12px 0 20px; flex-wrap: wrap; }
+  .toolbar select, .toolbar button {
+      font-size: 13px; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;
+      background: #fff; cursor: pointer; }
+  .meta { font-size: 12px; color: #888; }
+  .comp { background: #fff; border: 1px solid #e3e3e6; border-radius: 8px;
+          margin-bottom: 18px; overflow: hidden; }
+  .comp > h2 { font-size: 15px; margin: 0; padding: 12px 16px; background: #f0f1f4;
+               border-bottom: 1px solid #e3e3e6; display: flex; justify-content: space-between;
+               align-items: baseline; gap: 10px; }
+  .comp > h2 .cnt { font-size: 12px; font-weight: 600; color: #666; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 16px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: #888;
+       background: #fafafa; position: sticky; top: 0; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafbff; }
+  .empty { padding: 14px 16px; color: #999; font-size: 13px; }
+  .st { display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+  .st-kesin  { background: #2e7d32; color: #fff; }
+  .st-aday   { background: transparent; color: #b26a00; border: 1px solid #b26a00; }
+  .st-bayrak { background: transparent; color: #00838f; border: 1px dashed #00838f; }
+  .ev { display: inline-block; margin: 1px 3px 1px 0; padding: 1px 5px; border-radius: 3px;
+        background: #eef; border: 1px solid #99c; color: #334; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .slot { font-family: ui-monospace, Menlo, monospace; color: #555; }
+  .coach { color: #2e7d32; font-size: 11px; }
+  #status { padding: 40px 16px; text-align: center; color: #888; }
+  @media print {
+    body { background: #fff; }
+    .toolbar, header.page a { display: none; }
+    .comp { border: none; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <h1>📋 Seçilen Sporcular</h1>
+    <a href="/">&larr; Panele dön</a>
+  </header>
+  <div class="toolbar">
+    <label>Cinsiyet:
+      <select id="genderFilter">
+        <option value="">Hepsi</option>
+        <option value="F">Kadın</option>
+        <option value="M">Erkek</option>
+      </select>
+    </label>
+    <button onclick="window.print()">🖨 Yazdır</button>
+    <span class="meta" id="meta"></span>
+  </div>
+  <div id="status">Yükleniyor…</div>
+  <div id="groups"></div>
+</div>
+
+<script src="results_data.js" onerror="void(0)"></script>
+<script>
+"use strict";
+
+// Static-site support: results_data.js sets window.STATIC_DATA on the GitHub
+// Pages build; on the live server it 404s and we hit the real endpoint.
+async function fetchRanking() {
+  if (window.STATIC_DATA) {
+    const pool = window.STATIC_DATA.combined || [];
+    return pool;
+  }
+  const r = await fetch('/api/ranking');
+  if (!r.ok) throw new Error('API ' + r.status);
+  return await r.json();
+}
+
+// Competition definitions — order = display order.
+const COMPS = [
+  {
+    key: 'multi_y', title: 'Multinations Yıldızlar',
+    kesin:  a => a.selected_yildiz_multinations,
+    aday:   a => a.candidate_yildiz_multinations,
+    bayrak: a => a.candidate_relay_yildiz_multinations,
+    events: a => a.multinations_events,
+    coach:  a => a.coach_called_yildiz_multinations,
+  },
+  {
+    key: 'comen', title: 'Comen Cup Yıldızlar',
+    kesin:  a => a.selected_yildiz_comen_cup_aralik || a.selected_yildiz_comen_cup_nisan,
+    aday:   () => false,
+    bayrak: a => a.candidate_relay_yildiz_comen_cup_aralik || a.candidate_relay_yildiz_comen_cup_nisan,
+    events: a => a.comen_cup_events,
+    coach:  a => a.coach_called_yildiz_comen_cup_aralik || a.coach_called_yildiz_comen_cup_nisan,
+  },
+  {
+    key: 'central', title: 'Central European Yıldızlar',
+    kesin:  a => a.selected_yildiz_central_europe_aralik || a.selected_yildiz_central_europe_nisan,
+    aday:   a => a.candidate_yildiz_central_europe_aralik || a.candidate_yildiz_central_europe_nisan,
+    bayrak: a => a.candidate_relay_yildiz_central_europe_aralik || a.candidate_relay_yildiz_central_europe_nisan,
+    events: a => a.central_europe_events,
+    coach:  a => a.coach_called_yildiz_central_europe_aralik || a.coach_called_yildiz_central_europe_nisan,
+  },
+  {
+    key: 'fed_tr', title: 'Federasyon Karması — Türkiye (TR)',
+    kesin:  a => a.selected === 'TR',
+    aday:   () => false, bayrak: () => false,
+    events: () => [], coach: () => false, slot: true,
+  },
+  {
+    key: 'fed_bolge', title: 'Federasyon Karması — Bölge',
+    kesin:  a => a.selected === 'BÖLGE',
+    aday:   () => false, bayrak: () => false,
+    events: () => [], coach: () => false, slot: true,
+  },
+  {
+    key: 'multi_g', title: 'Multinations Gençler',
+    kesin:  a => a.selected_multinations_gencler,
+    aday:   a => a.candidate_multinations_gencler,
+    bayrak: a => a.candidate_relay_multinations_gencler,
+    events: a => a.multinations_gencler_events,
+    coach:  a => a.coach_called_multinations_gencler,
+  },
+  {
+    key: 'avrupa_g', title: 'Avrupa Gençler',
+    kesin:  a => a.selected_avrupa_gencler,
+    aday:   () => false,
+    bayrak: a => a.candidate_relay_avrupa_gencler,
+    events: a => a.avrupa_gencler_events,
+    coach:  a => a.coach_called_avrupa_gencler,
+  },
+];
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function evChips(events) {
+  if (!Array.isArray(events) || !events.length) return '';
+  return events.map(e => {
+    const s = Array.isArray(e) ? e[0] : e.stroke;
+    const d = Array.isArray(e) ? e[1] : e.distance;
+    return '<span class="ev">🏅 ' + esc(s) + ' ' + esc(d) + '</span>';
+  }).join('');
+}
+
+function rowsFor(comp, athletes) {
+  const out = [];
+  for (const a of athletes) {
+    let status = null;
+    if (comp.kesin(a))       status = ['st-kesin', 'KESİN'];
+    else if (comp.aday(a))   status = ['st-aday', 'ADAY'];
+    else if (comp.bayrak(a)) status = ['st-bayrak', 'BAYRAK ADAYI'];
+    if (!status) continue;
+    out.push({ a, status });
+  }
+  // Fed Karması: sort by slot; others: birth year then name.
+  if (comp.slot) {
+    out.sort((x, y) => String(x.a.selected_slot || '').localeCompare(
+      String(y.a.selected_slot || ''), 'tr', { numeric: true }));
+  } else {
+    out.sort((x, y) => (x.a.birth_year - y.a.birth_year) ||
+      String(x.a.athlete_name).localeCompare(String(y.a.athlete_name), 'tr'));
+  }
+  return out;
+}
+
+function render(athletes) {
+  const g = document.getElementById('genderFilter').value;
+  const pool = g ? athletes.filter(a => a.gender === g) : athletes;
+  const container = document.getElementById('groups');
+  container.innerHTML = '';
+  let grandKesin = 0, grandAday = 0;
+
+  for (const comp of COMPS) {
+    const rows = rowsFor(comp, pool);
+    const nK = rows.filter(r => r.status[1] === 'KESİN').length;
+    const nA = rows.length - nK;
+    grandKesin += nK; grandAday += nA;
+
+    const sec = document.createElement('section');
+    sec.className = 'comp';
+    const cntTxt = nA ? (nK + ' kesin · ' + nA + ' aday') : (nK + ' kesin');
+    let html = '<h2><span>' + esc(comp.title) + '</span><span class="cnt">' + cntTxt + '</span></h2>';
+
+    if (!rows.length) {
+      html += '<div class="empty">Seçilen sporcu yok' + (g ? ' (bu cinsiyette)' : '') + '.</div>';
+    } else {
+      html += '<table><thead><tr>' +
+        '<th>Sporcu</th><th>Doğum</th><th>Cins</th><th>Şehir (Kulüp)</th><th>Durum</th>' +
+        (comp.slot ? '<th>Slot</th>' : '<th>Karar veren yarışlar</th>') +
+        '</tr></thead><tbody>';
+      for (const { a, status } of rows) {
+        const coachTxt = comp.coach(a) ? ' <span class="coach">· antrenör barajı ✓</span>' : '';
+        html += '<tr>' +
+          '<td>' + esc(a.athlete_name) + '</td>' +
+          '<td>' + esc(a.birth_year) + '</td>' +
+          '<td>' + (a.gender === 'F' ? 'K' : 'E') + '</td>' +
+          '<td>' + esc(a.city) + ' (' + esc(a.club) + ')</td>' +
+          '<td><span class="st ' + status[0] + '">' + status[1] + '</span>' + coachTxt + '</td>' +
+          (comp.slot
+            ? '<td class="slot">' + esc(a.selected_slot || '-') + '</td>'
+            : '<td>' + (evChips(comp.events(a)) || '<span class="meta">—</span>') + '</td>') +
+          '</tr>';
+      }
+      html += '</tbody></table>';
+    }
+    sec.innerHTML = html;
+    container.appendChild(sec);
+  }
+  document.getElementById('meta').textContent =
+    'Toplam: ' + grandKesin + ' kesin, ' + grandAday + ' aday seçim' +
+    (window.STATIC_DATA && window.STATIC_DATA.generated_at
+      ? ' · veri: ' + window.STATIC_DATA.generated_at : '');
+}
+
+let _athletes = [];
+fetchRanking()
+  .then(data => {
+    _athletes = Array.isArray(data) ? data : [];
+    document.getElementById('status').style.display = 'none';
+    render(_athletes);
+  })
+  .catch(err => {
+    document.getElementById('status').textContent = 'Veri yüklenemedi: ' + err.message;
+  });
+document.getElementById('genderFilter').addEventListener('change', () => render(_athletes));
+</script>
+</body>
+</html>

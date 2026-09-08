@@ -511,6 +511,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         """Handle GET requests."""
         if self.path == '/':
             self.serve_index()
+        elif self.path == '/secilenler':
+            self.serve_secilenler()
         elif self.path.startswith('/api/ranking'):
             self.serve_api_ranking()
         elif self.path.startswith('/api/regional'):
@@ -545,6 +547,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.wfile.write(html.encode('utf-8'))
         except FileNotFoundError:
             self.send_error(404, "index.html not found")
+
+    def serve_secilenler(self):
+        """Serve the consolidated 'selected athletes' view (secilenler.html)."""
+        try:
+            html_path = Path(__file__).parent / "secilenler.html"
+            with open(html_path, 'r', encoding='utf-8') as f:
+                html = f.read()
+
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html; charset=utf-8')
+            self.send_header('Content-length', len(html.encode('utf-8')))
+            self.end_headers()
+            self.wfile.write(html.encode('utf-8'))
+        except FileNotFoundError:
+            self.send_error(404, "secilenler.html not found")
 
     def serve_static_file(self):
         """Serve static files from panel directory (CSS, JS, etc)."""

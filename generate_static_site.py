@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from database.db import get_athlete_rankings
 from federasyon.yildizlar_ranker import select_all_yildizlar
+from federasyon.gencler_ranker import select_all_gencler
 from panel.serve import apply_selection_status_with_points
 
 OUT_DIR = Path(__file__).parent / "docs"
@@ -56,6 +57,7 @@ def build_leg_data(leg: str) -> list:
     leg filter -> Federasyon Karması selection -> response shape."""
     athletes = get_athlete_rankings(None, None, None)
     athletes = select_all_yildizlar(athletes)
+    athletes = select_all_gencler(athletes)
 
     if leg == "antalya":
         athletes = [a for a in athletes if len(a["antalya_events"]) > 0]
@@ -118,6 +120,19 @@ def build_leg_data(leg: str) -> list:
             "candidate_relay_yildiz_central_europe_nisan": athlete.get("candidate_relay_yildiz_central_europe_nisan", False),
             "coach_called_yildiz_central_europe_aralik": athlete.get("coach_called_yildiz_central_europe_aralik", False),
             "coach_called_yildiz_central_europe_nisan": athlete.get("coach_called_yildiz_central_europe_nisan", False),
+            "selected_multinations_gencler": athlete.get("selected_multinations_gencler", False),
+            "candidate_multinations_gencler": athlete.get("candidate_multinations_gencler", False),
+            "candidate_relay_multinations_gencler": athlete.get("candidate_relay_multinations_gencler", False),
+            "coach_called_multinations_gencler": athlete.get("coach_called_multinations_gencler", False),
+            "selected_avrupa_gencler": athlete.get("selected_avrupa_gencler", False),
+            "coach_called_avrupa_gencler": athlete.get("coach_called_avrupa_gencler", False),
+            "candidate_relay_avrupa_gencler": athlete.get("candidate_relay_avrupa_gencler", False),
+            "avrupa_gencler_event_count": len(athlete.get("avrupa_gencler_events", [])),
+            "multinations_events": [list(e) for e in athlete.get("multinations_events", [])],
+            "comen_cup_events": [list(e) for e in athlete.get("comen_cup_events", [])],
+            "central_europe_events": [list(e) for e in athlete.get("central_europe_events", [])],
+            "multinations_gencler_events": [list(e) for e in athlete.get("multinations_gencler_events", [])],
+            "avrupa_gencler_events": [list(e) for e in athlete.get("avrupa_gencler_events", [])],
         })
     return response
 
@@ -140,6 +155,7 @@ def main():
         f.write(";\n")
 
     shutil.copy(PANEL_DIR / "index.html", OUT_DIR / "index.html")
+    shutil.copy(PANEL_DIR / "secilenler.html", OUT_DIR / "secilenler.html")
     styles_src = PANEL_DIR / "styles.css"
     if styles_src.exists():
         shutil.copy(styles_src, OUT_DIR / "styles.css")
