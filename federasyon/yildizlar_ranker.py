@@ -625,7 +625,9 @@ def select_yildizlar_central_europe_aralik(athletes):
         elif aid in cand_ids:
             athlete['selected_yildiz_central_europe_aralik'] = False
             athlete['candidate_yildiz_central_europe_aralik'] = True
-            athlete.setdefault('central_europe_events', [])
+            athlete['central_europe_events'] = sorted(
+                set(athlete.get('central_europe_events', [])) | set(athlete.get('_first_events', []))
+            )
             athlete['coach_called_yildiz_central_europe_aralik'] = False
         else:
             athlete['selected_yildiz_central_europe_aralik'] = False
@@ -701,7 +703,9 @@ def select_yildizlar_central_europe_nisan(athletes):
         elif aid in cand_ids:
             athlete['selected_yildiz_central_europe_nisan'] = False
             athlete['candidate_yildiz_central_europe_nisan'] = True
-            athlete.setdefault('central_europe_events', [])
+            athlete['central_europe_events'] = sorted(
+                set(athlete.get('central_europe_events', [])) | set(athlete.get('_first_events', []))
+            )
             athlete['coach_called_yildiz_central_europe_nisan'] = False
         else:
             athlete['selected_yildiz_central_europe_nisan'] = False

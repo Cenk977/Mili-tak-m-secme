@@ -61,6 +61,29 @@ def test_comen_events_union_of_aralik_and_nisan_wins():
     assert by["O"]["comen_cup_events"] == []
 
 
+def test_central_quota_trimmed_candidate_keeps_won_events():
+    # 13 female winners (each wins a distinct event) -> quota 12, so the
+    # last one is quota-trimmed into cand_ids (madde 5) but still won a branch.
+    events = [
+        ("Serbest", 50), ("Serbest", 100), ("Serbest", 200), ("Serbest", 400),
+        ("Serbest", 800), ("Sırtüstü", 50), ("Sırtüstü", 100), ("Sırtüstü", 200),
+        ("Kurbağalama", 50), ("Kurbağalama", 100), ("Kurbağalama", 200),
+        ("Kelebek", 50), ("Kelebek", 100),
+    ]
+    ath = [_a("W%d" % i, "F", 2012, antalya={ev: "00:00:30.00"})
+           for i, ev in enumerate(events)]
+    ath = select_yildizlar_central_europe_aralik(ath)
+    ath = select_yildizlar_central_europe_nisan(ath)
+    by = {a["athlete_id"]: a for a in ath}
+    trimmed = [a for a in ath if a.get("candidate_yildiz_central_europe_nisan")]
+    assert trimmed, "expected at least one quota-trimmed candidate"
+    for a in trimmed:
+        assert a["central_europe_events"], (
+            "quota-trimmed candidate %s lost its won events" % a["athlete_id"])
+        won = list(a["antalya_events"].keys())[0]
+        assert won in a["central_europe_events"]
+
+
 def test_central_events_populated():
     w = _a("W", "M", 2012, antalya={("Sırtüstü", 200): "00:02:05.00"})
     o = _a("O", "M", 2012, antalya={("Sırtüstü", 200): "00:03:00.00"})
