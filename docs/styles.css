@@ -1,5 +1,9 @@
 /* ===== THEME VARIABLES ===== */
+/* Panel açık-tema tasarlandı (yüzlerce sabit açık renk satır-içi stil var).
+   Otomatik gece modu yalnızca yarısını çeviriyordu -> gri zeminde açık yazı,
+   telefonda okunmuyordu. Bu yüzden uygulama her cihazda AÇIK temada sabit. */
 :root {
+  color-scheme: light;
   /* Light theme (default / gündüz) */
   --bg-main: #ffffff;
   --bg-row: #f9f9f9;
@@ -15,23 +19,7 @@
   --highlight-top3: #ffd700;
 }
 
-/* Dark theme (gece) - auto-activate on system dark mode preference */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-main: #1a1a1a;
-    --bg-row: #2a2a2a;
-    --bg-row-hover: #333;
-    --text-main: #ffffff;
-    --text-secondary: #aaa;
-    --border-color: #444;
-    --header-bg: #0d0d0d;
-    --badge-tr: #5ba3ff;
-    --badge-bolge: #ffb84d;
-    --badge-multi: #bb86fc;
-    --badge-baraj: #999;
-    --highlight-top3: #ffd700;
-  }
-}
+/* (Gece modu bilerek kapatıldı — yukarıdaki nota bakın.) */
 
 /* ===== MAIN CONTAINER ===== */
 body {

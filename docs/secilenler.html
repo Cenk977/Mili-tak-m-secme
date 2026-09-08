@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seçilen Sporcular — Milli Takım Seçme 2026</title>
 <style>
+  :root { color-scheme: light; }
   * { box-sizing: border-box; }
+  html, body { background: #f4f5f7; }
   body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-         background: #f4f5f7; color: #1a1a1a; }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+         color: #1a1a1a; -webkit-text-size-adjust: 100%; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px 60px; }
+  .tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   header.page { display: flex; align-items: baseline; justify-content: space-between;
                 flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
   header.page h1 { font-size: 20px; margin: 0; }
@@ -48,6 +51,35 @@
   .rowsep td { border-top: 2px solid #eceae2; }
   #status { padding: 40px 16px; text-align: center; color: #888; }
   #status.err { color: #b00020; }
+
+  /* Telefon: tabloyu satır satır kart görünümüne çevir — tek ekrana sığar,
+     yana kaydırmaya gerek kalmaz. */
+  @media (max-width: 640px) {
+    .wrap { padding: 14px 10px 50px; }
+    .tab { font-size: 12px; padding: 6px 10px; }
+    .comp > h2 { font-size: 14px; padding: 10px 12px; }
+    table, thead, tbody, th, td, tr { display: block; }
+    thead { position: absolute; left: -9999px; }
+    tbody tr {
+      border-bottom: 1px solid #e3e3e6; padding: 8px 12px;
+      display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;
+    }
+    tbody tr.rowsep { border-top: 2px solid #eceae2; }
+    tbody td { border: none; padding: 1px 0; }
+    /* 1. hücre (Sporcu) tam genişlik, kalın */
+    tbody td:nth-child(1) { grid-column: 1 / -1; font-weight: 700; font-size: 14px; }
+    /* Doğum + Cins yan yana küçük */
+    tbody td:nth-child(2), tbody td:nth-child(3) {
+      color: #666; font-size: 12px; grid-column: auto;
+    }
+    tbody td:nth-child(2)::before { content: "Doğum: "; color: #999; }
+    tbody td:nth-child(3)::before { content: "· "; }
+    tbody td:nth-child(4) { grid-column: 1 / -1; color: #555; font-size: 12px; }
+    tbody td:nth-child(5) { grid-column: 1 / -1; margin-top: 2px; }
+    tbody td:nth-child(6) { grid-column: 1 / -1; margin-top: 2px; }
+    .ev { font-size: 10px; }
+  }
+
   @media print {
     body { background: #fff; }
     .toolbar, .tabs, header.page a { display: none; }
@@ -233,7 +265,7 @@ function renderPanel(pool) {
   if (!rows.length) {
     html += '<div class="empty">Bu filtreyle seçilen sporcu yok.</div>';
   } else {
-    html += '<table><thead><tr>' +
+    html += '<div class="tablewrap"><table><thead><tr>' +
       '<th>Sporcu</th><th>Doğum</th><th>Cins</th><th>Şehir (Kulüp)</th><th>Durum</th>' +
       (comp.slot ? '<th>Slot · Puan yarışları</th>' : '<th>Karar veren yarışlar</th>') +
       '</tr></thead><tbody>';
@@ -257,7 +289,7 @@ function renderPanel(pool) {
         '<td>' + lastCell + '</td>' +
         '</tr>';
     }
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
   }
   html += '</section>';
   document.getElementById('panel').innerHTML = html;
