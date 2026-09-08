@@ -649,5 +649,33 @@ def test_api_ranking_serializes_secim_events():
     assert serialized == [["Serbest", 50]]
 
 
+def test_get_secilenler_serves_html():
+    """GET /secilenler returns the consolidated selected-athletes page."""
+    from panel.serve import DashboardHandler
+    from io import BytesIO
+    from unittest.mock import Mock
+
+    handler = DashboardHandler(
+        request=Mock(makefile=Mock(return_value=BytesIO(b''))),
+        client_address=('127.0.0.1', 8765),
+        server=Mock(),
+    )
+    handler.wfile = BytesIO()
+    handler.command = 'GET'
+    handler.path = '/secilenler'
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+
+    handler.do_GET()
+
+    handler.send_response.assert_called_with(200)
+    handler.send_header.assert_any_call('Content-type', 'text/html; charset=utf-8')
+    body = handler.wfile.getvalue().decode('utf-8')
+    assert 'Seçilen Sporcular' in body
+    assert 'Multinations Gençler' in body
+    assert 'Avrupa Gençler' in body
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
