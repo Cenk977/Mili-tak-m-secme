@@ -617,5 +617,21 @@ class TestYildizlarBirthYearPooling:
         )
 
 
+def test_api_ranking_includes_gencler_fields():
+    """select_all_gencler /api/ranking akışında çağrılır ve alanlar yanıta girer."""
+    from federasyon.gencler_ranker import select_all_gencler
+    ath = [{
+        "athlete_id": "g1", "athlete_name": "Genç Sporcu", "birth_year": 2009,
+        "gender": "F", "region": 1, "city": "İstanbul", "club": "X",
+        "antalya_events_time": {("Serbest", 50): "00:00:25.00"},
+        "combined_events": {("Serbest", 50): 9},
+        "combined_events_time": {("Serbest", 50): "00:00:25.00"},
+    }]
+    out = select_all_gencler(ath)
+    assert out[0]["selected_multinations_gencler"] is True
+    assert out[0]["selected_avrupa_gencler"] is True
+    assert isinstance(out[0]["avrupa_gencler_events"], list)
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
