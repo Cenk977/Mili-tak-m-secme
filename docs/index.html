@@ -663,6 +663,7 @@
         <div class="header">
             <h1>Milli Takım Seçme 2026</h1>
             <p>Ulusal Takım Sporcuları Değerlendirme Sistemi</p>
+            <p style="margin-top:6px;"><a href="/secilenler" target="_blank" style="color:#fff;font-weight:600;text-decoration:underline;">📋 Seçilen Sporcular (tek ekran) ↗</a></p>
         </div>
 
         <div class="content">
@@ -1148,6 +1149,20 @@
                 athlete.selected_yildiz_central_europe_nisan ? 'Seçildi ✓' : '-';
             document.getElementById('yildiz-central-nisan-coach').textContent =
                 athlete.coach_called_yildiz_central_europe_nisan ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('genc-multi-status').textContent =
+                athlete.selected_multinations_gencler ? 'Seçildi ✓'
+                : (athlete.candidate_multinations_gencler ? 'Aday'
+                : (athlete.candidate_relay_multinations_gencler ? 'Bayrak adayı' : '-'));
+            document.getElementById('genc-multi-coach').textContent =
+                athlete.coach_called_multinations_gencler ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('genc-avrupa-status').textContent =
+                athlete.selected_avrupa_gencler
+                    ? ('Seçildi ✓ (' + (athlete.avrupa_gencler_event_count || 0) + ' branş)')
+                    : (athlete.candidate_relay_avrupa_gencler ? 'Bayrak adayı' : '-');
+            document.getElementById('genc-avrupa-coach').textContent =
+                athlete.coach_called_avrupa_gencler ? 'Antrenör barajı geçti' : '-';
         }
 
         // Map ranking number to medal emoji or ordinal
@@ -1281,8 +1296,27 @@
 
             html += '</div>';
 
+            // Gençler Milli Takımları section
+            html += '<div class="yildizlar-section">';
+            html += '<h3 style="margin: 0 0 15px 0; font-size: 14px; color: #333;">Gençler Milli Takımları</h3>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Multinations Gençler:</strong>';
+            html += '<span id="genc-multi-status">-</span> | ';
+            html += '<span id="genc-multi-coach">-</span>';
+            html += '</div>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Avrupa Gençler:</strong>';
+            html += '<span id="genc-avrupa-status">-</span> | ';
+            html += '<span id="genc-avrupa-coach">-</span>';
+            html += '<div style="font-size: 11px; color: #999;">Kısmi — yalnızca TYF Aralık/Nisan verisi</div>';
+            html += '</div>';
+
+            html += '</div>';
+
             // Helper function to render events table
-            function renderEventsTable(events, title) {
+            function renderEventsTable(events, title, eventBadges) {
                 if (!events || Object.keys(events).length === 0) {
                     return `<div style="color: #999; font-size: 12px; padding: 10px; background: white; border-radius: 4px;">Yarışma kaydı yok</div>`;
                 }
@@ -1304,24 +1338,32 @@
                     html += `<tr style="border-bottom: 1px solid #eee; font-size: 12px;">
                         <td style="padding: 6px;">${race.stroke}</td>
                         <td style="padding: 6px;">${race.distance}m</td>
-                        <td style="text-align: center; padding: 6px; font-family: monospace; color: #666;">${race.time}</td>
+                        <td style="text-align: center; padding: 6px; font-family: monospace; color: #666;">${race.time}${(() => { const bs = (eventBadges && eventBadges[race.stroke + '|' + race.distance]) || []; return bs.map(b => `<span style="display:inline-block;margin-left:4px;background:#eef;border:1px solid #99c;color:#334;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;">🏅 ${b}</span>`).join(''); })()}</td>
                     </tr>`;
                 });
                 html += `</tbody></table></div>`;
                 return html;
             }
 
+            const badgeMap = {};
+            const addBadges = (arr, label) => (arr || []).forEach(([s, d]) => { const k = s + '|' + d; (badgeMap[k] = badgeMap[k] || []).push(label); });
+            addBadges(athlete.multinations_events, 'Multi');
+            addBadges(athlete.comen_cup_events, 'Comen');
+            addBadges(athlete.central_europe_events, 'Central');
+            addBadges(athlete.multinations_gencler_events, 'Multi Gençler');
+            addBadges(athlete.avrupa_gencler_events, 'Avrupa Gençler');
+
             // Show events based on current leg selection
             if (currentLeg === 'antalya') {
                 // Show only Antalya events
-                html += renderEventsTable(athlete.antalya_events, '📅 Aralık 2025 (Antalya)');
+                html += renderEventsTable(athlete.antalya_events, '📅 Aralık 2025 (Antalya)', badgeMap);
             } else if (currentLeg === 'edirne') {
                 // Show only Edirne events
-                html += renderEventsTable(athlete.edirne_events, '📅 Nisan 2026 (Edirne)');
+                html += renderEventsTable(athlete.edirne_events, '📅 Nisan 2026 (Edirne)', badgeMap);
             } else {
                 // Show both for combined
-                html += renderEventsTable(athlete.antalya_events, '📅 Aralık 2025 (Antalya)');
-                html += renderEventsTable(athlete.edirne_events, '📅 Nisan 2026 (Edirne)');
+                html += renderEventsTable(athlete.antalya_events, '📅 Aralık 2025 (Antalya)', badgeMap);
+                html += renderEventsTable(athlete.edirne_events, '📅 Nisan 2026 (Edirne)', badgeMap);
             }
 
             // Show combined scoring only for combined view
@@ -1483,6 +1525,7 @@
                                 ${multinationsSelected ? '<span style="display: inline-block; margin-left: 6px; background: #c2185b; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">MULTI</span>' : ''}${multinationsCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #c2185b; border: 1px solid #c2185b; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="Federasyon takdirine bağlı aday - 2./3.lük ile kota tamamlama">MULTI-ADAY</span>' : ''}${multinationsRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #00838f; border: 1px dashed #00838f; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="100m/200m branşlarda üst sıra - bayrak takımı için değerlendirilebilir">BAYRAK ADAYI</span>' : ''}
                                 ${comenCupSelected ? '<span style="display: inline-block; margin-left: 4px; background: #1976d2; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">COMEN</span>' : ''}
                                 ${centralSelected ? '<span style="display: inline-block; margin-left: 4px; background: #388e3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">CENTRAL</span>' : ''}${centralCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #388e3c; border: 1px solid #388e3c; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="Federasyon takdirine bağlı aday - kota tamamlama">CENTRAL-ADAY</span>' : ''}${centralRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #00838f; border: 1px dashed #00838f; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="100m/200m branşlarda üst sıra - bayrak takımı için değerlendirilebilir">BAYRAK ADAYI</span>' : ''}${comenRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #1976d2; border: 1px dashed #1976d2; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="50m/100m/200m branşlarda üst sıra - Comen Cup bayrak takımı için değerlendirilebilir">COMEN-BAYRAK</span>' : ''}
+                                ${athlete.selected_multinations_gencler ? '<span style="display:inline-block;margin-left:4px;background:#ad1457;color:white;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">MULTI-G</span>' : ''}${athlete.candidate_multinations_gencler ? '<span style="display:inline-block;margin-left:4px;background:transparent;color:#ad1457;border:1px solid #ad1457;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;" title="Madde 5 kota kırpması - aday">MULTI-G ADAY</span>' : ''}${athlete.selected_avrupa_gencler ? '<span style="display:inline-block;margin-left:4px;background:#00695c;color:white;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">AVR-G</span>' : ''}${athlete.candidate_relay_avrupa_gencler && !athlete.selected_avrupa_gencler ? '<span style="display:inline-block;margin-left:4px;background:transparent;color:#00695c;border:1px dashed #00695c;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;">AVR-G BAYRAK</span>' : ''}
                                 ${federasyonKarmaSelected ? '<span style="display: inline-block; margin-left: 4px; background: #f57c00; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">FED.KARMA</span>' : ''}
                             </div>
                         </div>
@@ -1624,6 +1667,7 @@
                                 ${multinationsSelected ? '<span style="display: inline-block; margin-left: 6px; background: #c2185b; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">MULTI</span>' : ''}${multinationsCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #c2185b; border: 1px solid #c2185b; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="Federasyon takdirine bağlı aday - 2./3.lük ile kota tamamlama">MULTI-ADAY</span>' : ''}${multinationsRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #00838f; border: 1px dashed #00838f; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="100m/200m branşlarda üst sıra - bayrak takımı için değerlendirilebilir">BAYRAK ADAYI</span>' : ''}
                                 ${comenCupSelected ? '<span style="display: inline-block; margin-left: 4px; background: #1976d2; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">COMEN</span>' : ''}
                                 ${centralSelected ? '<span style="display: inline-block; margin-left: 4px; background: #388e3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">CENTRAL</span>' : ''}${centralCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #388e3c; border: 1px solid #388e3c; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="Federasyon takdirine bağlı aday - kota tamamlama">CENTRAL-ADAY</span>' : ''}${centralRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #00838f; border: 1px dashed #00838f; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="100m/200m branşlarda üst sıra - bayrak takımı için değerlendirilebilir">BAYRAK ADAYI</span>' : ''}${comenRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #1976d2; border: 1px dashed #1976d2; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="50m/100m/200m branşlarda üst sıra - Comen Cup bayrak takımı için değerlendirilebilir">COMEN-BAYRAK</span>' : ''}
+                                ${athlete.selected_multinations_gencler ? '<span style="display:inline-block;margin-left:4px;background:#ad1457;color:white;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">MULTI-G</span>' : ''}${athlete.candidate_multinations_gencler ? '<span style="display:inline-block;margin-left:4px;background:transparent;color:#ad1457;border:1px solid #ad1457;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;" title="Madde 5 kota kırpması - aday">MULTI-G ADAY</span>' : ''}${athlete.selected_avrupa_gencler ? '<span style="display:inline-block;margin-left:4px;background:#00695c;color:white;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">AVR-G</span>' : ''}${athlete.candidate_relay_avrupa_gencler && !athlete.selected_avrupa_gencler ? '<span style="display:inline-block;margin-left:4px;background:transparent;color:#00695c;border:1px dashed #00695c;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;">AVR-G BAYRAK</span>' : ''}
                                 ${federasyonKarmaSelected ? '<span style="display: inline-block; margin-left: 4px; background: #f57c00; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">FED.KARMA</span>' : ''}
                             </div>
                             <div class="col-action">

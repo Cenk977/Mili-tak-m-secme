@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seçilen Sporcular — Milli Takım Seçme 2026</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+         background: #f4f5f7; color: #1a1a1a; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  header.page { display: flex; align-items: baseline; justify-content: space-between;
+                flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+  header.page h1 { font-size: 20px; margin: 0; }
+  header.page a { font-size: 13px; color: #667eea; text-decoration: none; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin: 12px 0 14px; flex-wrap: wrap; }
+  .toolbar label { font-size: 13px; color: #444; }
+  .toolbar select, .toolbar button {
+      font-size: 13px; padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;
+      background: #fff; cursor: pointer; }
+  .meta { font-size: 12px; color: #888; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .tab { font-size: 13px; padding: 7px 12px; border: 1px solid #d5d5d9; border-radius: 999px;
+         background: #fff; cursor: pointer; color: #333; }
+  .tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .tab .b { font-weight: 700; }
+  .tab .z { opacity: .55; }
+  .comp { background: #fff; border: 1px solid #e3e3e6; border-radius: 8px; overflow: hidden; }
+  .comp > h2 { font-size: 15px; margin: 0; padding: 12px 16px; background: #f0f1f4;
+               border-bottom: 1px solid #e3e3e6; display: flex; justify-content: space-between;
+               align-items: baseline; gap: 10px; }
+  .comp > h2 .cnt { font-size: 12px; font-weight: 600; color: #666; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 16px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: #888; background: #fafafa; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafbff; }
+  tbody tr.grp-aday td, tbody tr.grp-bayrak td { background: #fcfbf7; }
+  .empty { padding: 14px 16px; color: #999; font-size: 13px; }
+  .st { display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+  .st-kesin  { background: #2e7d32; color: #fff; }
+  .st-aday   { background: transparent; color: #b26a00; border: 1px solid #b26a00; }
+  .st-bayrak { background: transparent; color: #00838f; border: 1px dashed #00838f; }
+  .ev { display: inline-block; margin: 1px 3px 1px 0; padding: 1px 5px; border-radius: 3px;
+        background: #eef; border: 1px solid #99c; color: #334; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .slot { font-family: ui-monospace, Menlo, monospace; color: #555; }
+  .coach { color: #2e7d32; font-size: 11px; }
+  .rowsep td { border-top: 2px solid #eceae2; }
+  #status { padding: 40px 16px; text-align: center; color: #888; }
+  #status.err { color: #b00020; }
+  @media print {
+    body { background: #fff; }
+    .toolbar, .tabs, header.page a { display: none; }
+    .comp { border: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <h1>📋 Seçilen Sporcular</h1>
+    <a href="/">&larr; Panele dön</a>
+  </header>
+  <div class="toolbar">
+    <label>Cinsiyet:
+      <select id="genderFilter">
+        <option value="">Hepsi</option>
+        <option value="F">Kadın</option>
+        <option value="M">Erkek</option>
+      </select>
+    </label>
+    <label>Doğum yılı:
+      <select id="yearFilter">
+        <option value="">Hepsi</option>
+        <option value="2008">2008</option>
+        <option value="2009">2009</option>
+        <option value="2010">2010</option>
+        <option value="2011">2011</option>
+        <option value="2012">2012</option>
+        <option value="2013">2013</option>
+      </select>
+    </label>
+    <button onclick="window.print()">🖨 Yazdır</button>
+    <span class="meta" id="meta"></span>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div id="status">Yükleniyor…</div>
+  <div id="panel"></div>
+</div>
+
+<script src="results_data.js" onerror="void(0)"></script>
+<script>
+"use strict";
+
+async function fetchRanking() {
+  if (window.STATIC_DATA) return window.STATIC_DATA.combined || [];
+  const r = await fetch('/api/ranking');
+  if (!r.ok) throw new Error('API ' + r.status);
+  return await r.json();
+}
+
+const COMPS = [
+  { key: 'multi_y', title: 'Multinations Yıldızlar',
+    kesin:  a => a.selected_yildiz_multinations,
+    aday:   a => a.candidate_yildiz_multinations,
+    bayrak: a => a.candidate_relay_yildiz_multinations,
+    events: a => a.multinations_events,
+    coach:  a => a.coach_called_yildiz_multinations },
+  { key: 'comen', title: 'Comen Cup Yıldızlar',
+    kesin:  a => a.selected_yildiz_comen_cup_aralik || a.selected_yildiz_comen_cup_nisan,
+    aday:   () => false,
+    bayrak: a => a.candidate_relay_yildiz_comen_cup_aralik || a.candidate_relay_yildiz_comen_cup_nisan,
+    events: a => a.comen_cup_events,
+    coach:  a => a.coach_called_yildiz_comen_cup_aralik || a.coach_called_yildiz_comen_cup_nisan },
+  { key: 'central', title: 'Central European Yıldızlar',
+    kesin:  a => a.selected_yildiz_central_europe_aralik || a.selected_yildiz_central_europe_nisan,
+    aday:   a => a.candidate_yildiz_central_europe_aralik || a.candidate_yildiz_central_europe_nisan,
+    bayrak: a => a.candidate_relay_yildiz_central_europe_aralik || a.candidate_relay_yildiz_central_europe_nisan,
+    events: a => a.central_europe_events,
+    coach:  a => a.coach_called_yildiz_central_europe_aralik || a.coach_called_yildiz_central_europe_nisan },
+  { key: 'fed_tr', title: 'Federasyon Karması — Türkiye (TR)', slot: true,
+    kesin:  a => a.selected === 'TR',
+    aday:   () => false, bayrak: () => false, events: () => [], coach: () => false },
+  { key: 'fed_bolge', title: 'Federasyon Karması — Bölge', slot: true,
+    kesin:  a => a.selected === 'BÖLGE',
+    aday:   () => false, bayrak: () => false, events: () => [], coach: () => false },
+  { key: 'multi_g', title: 'Multinations Gençler',
+    kesin:  a => a.selected_multinations_gencler,
+    aday:   a => a.candidate_multinations_gencler,
+    bayrak: a => a.candidate_relay_multinations_gencler,
+    events: a => a.multinations_gencler_events,
+    coach:  a => a.coach_called_multinations_gencler },
+  { key: 'avrupa_g', title: 'Avrupa Gençler',
+    kesin:  a => a.selected_avrupa_gencler,
+    aday:   () => false,
+    bayrak: a => a.candidate_relay_avrupa_gencler,
+    events: a => a.avrupa_gencler_events,
+    coach:  a => a.coach_called_avrupa_gencler },
+];
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function evChips(events) {
+  if (!Array.isArray(events) || !events.length) return '';
+  return events.map(e => {
+    const s = Array.isArray(e) ? e[0] : e.stroke;
+    const d = Array.isArray(e) ? e[1] : e.distance;
+    return '<span class="ev">🏅 ' + esc(s) + ' ' + esc(d) + '</span>';
+  }).join('');
+}
+
+// Fed Karması puan bazlı — "karar veren yarışlar" = en yüksek puanlı ilk 3 branş.
+function top3PointChips(a) {
+  const ce = a.combined_events;
+  if (!ce || typeof ce !== 'object') return '';
+  const rows = [];
+  for (const key in ce) {
+    let stroke, dist;
+    try { [stroke, dist] = JSON.parse(key); } catch (_) { continue; }
+    const v = ce[key];
+    const pts = (v && typeof v === 'object') ? (v.points || 0) : (v || 0);
+    if (pts > 0) rows.push({ stroke, dist, pts });
+  }
+  rows.sort((x, y) => y.pts - x.pts);
+  return rows.slice(0, 3).map(r =>
+    '<span class="ev">🏅 ' + esc(r.stroke) + ' ' + esc(r.dist) + ' (' + r.pts + ')</span>').join('');
+}
+
+const STATUS_RANK = { 'KESİN': 0, 'ADAY': 1, 'BAYRAK ADAYI': 2 };
+
+function rowsFor(comp, athletes) {
+  const out = [];
+  for (const a of athletes) {
+    let status = null;
+    if (comp.kesin(a))       status = ['st-kesin', 'KESİN'];
+    else if (comp.aday(a))   status = ['st-aday', 'ADAY'];
+    else if (comp.bayrak(a)) status = ['st-bayrak', 'BAYRAK ADAYI'];
+    if (!status) continue;
+    out.push({ a, status });
+  }
+  out.sort((x, y) => {
+    const r = STATUS_RANK[x.status[1]] - STATUS_RANK[y.status[1]];
+    if (r) return r;
+    if (comp.slot) {
+      return String(x.a.selected_slot || '').localeCompare(
+        String(y.a.selected_slot || ''), 'tr', { numeric: true });
+    }
+    return (x.a.birth_year - y.a.birth_year) ||
+      String(x.a.athlete_name).localeCompare(String(y.a.athlete_name), 'tr');
+  });
+  return out;
+}
+
+let _athletes = [];
+let _activeTab = COMPS[0].key;
+
+function filteredPool() {
+  const g = document.getElementById('genderFilter').value;
+  const y = document.getElementById('yearFilter').value;
+  return _athletes.filter(a =>
+    (!g || a.gender === g) && (!y || String(a.birth_year) === y));
+}
+
+function renderTabs(pool) {
+  const tabsEl = document.getElementById('tabs');
+  tabsEl.innerHTML = '';
+  for (const comp of COMPS) {
+    const rows = rowsFor(comp, pool);
+    const nK = rows.filter(r => r.status[1] === 'KESİN').length;
+    const nOther = rows.length - nK;
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (comp.key === _activeTab ? ' active' : '');
+    btn.innerHTML = esc(comp.title) + ' <span class="b">' + nK + '</span>' +
+      (nOther ? ' <span class="z">+' + nOther + '</span>' : '');
+    btn.onclick = () => { _activeTab = comp.key; renderAll(); };
+    tabsEl.appendChild(btn);
+  }
+}
+
+function renderPanel(pool) {
+  const comp = COMPS.find(c => c.key === _activeTab) || COMPS[0];
+  const rows = rowsFor(comp, pool);
+  const nK = rows.filter(r => r.status[1] === 'KESİN').length;
+  const nA = rows.length - nK;
+  const cntTxt = nA ? (nK + ' kesin · ' + nA + ' aday') : (nK + ' kesin');
+
+  let html = '<section class="comp"><h2><span>' + esc(comp.title) +
+    '</span><span class="cnt">' + cntTxt + '</span></h2>';
+
+  if (!rows.length) {
+    html += '<div class="empty">Bu filtreyle seçilen sporcu yok.</div>';
+  } else {
+    html += '<table><thead><tr>' +
+      '<th>Sporcu</th><th>Doğum</th><th>Cins</th><th>Şehir (Kulüp)</th><th>Durum</th>' +
+      (comp.slot ? '<th>Slot · Puan yarışları</th>' : '<th>Karar veren yarışlar</th>') +
+      '</tr></thead><tbody>';
+    let prevStatus = null;
+    for (const { a, status } of rows) {
+      const sep = (prevStatus && prevStatus !== status[1]) ? ' rowsep' : '';
+      prevStatus = status[1];
+      const grpCls = status[1] === 'KESİN' ? '' :
+        (status[1] === 'ADAY' ? ' grp-aday' : ' grp-bayrak');
+      const coachTxt = comp.coach(a) ? ' <span class="coach">· antrenör barajı ✓</span>' : '';
+      const lastCell = comp.slot
+        ? ('<span class="slot">' + esc(a.selected_slot || '-') + '</span> ' +
+           (top3PointChips(a) || '<span class="meta">—</span>'))
+        : (evChips(comp.events(a)) || '<span class="meta">—</span>');
+      html += '<tr class="' + grpCls.trim() + sep + '">' +
+        '<td>' + esc(a.athlete_name) + '</td>' +
+        '<td>' + esc(a.birth_year) + '</td>' +
+        '<td>' + (a.gender === 'F' ? 'K' : 'E') + '</td>' +
+        '<td>' + esc(a.city) + ' (' + esc(a.club) + ')</td>' +
+        '<td><span class="st ' + status[0] + '">' + status[1] + '</span>' + coachTxt + '</td>' +
+        '<td>' + lastCell + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table>';
+  }
+  html += '</section>';
+  document.getElementById('panel').innerHTML = html;
+}
+
+function renderAll() {
+  const pool = filteredPool();
+  renderTabs(pool);
+  renderPanel(pool);
+  let gK = 0, gA = 0;
+  for (const comp of COMPS) {
+    const rs = rowsFor(comp, pool);
+    const k = rs.filter(r => r.status[1] === 'KESİN').length;
+    gK += k; gA += rs.length - k;
+  }
+  document.getElementById('meta').textContent =
+    'Tüm müsabakalar: ' + gK + ' kesin, ' + gA + ' aday' +
+    (window.STATIC_DATA && window.STATIC_DATA.generated_at
+      ? ' · veri: ' + window.STATIC_DATA.generated_at : '');
+}
+
+fetchRanking()
+  .then(data => {
+    _athletes = Array.isArray(data) ? data : [];
+    document.getElementById('status').style.display = 'none';
+    renderAll();
+  })
+  .catch(err => {
+    const s = document.getElementById('status');
+    s.className = 'err';
+    s.textContent = 'Veri yüklenemedi: ' + err.message + ' — sunucu çalışıyor mu?';
+  });
+
+document.getElementById('genderFilter').addEventListener('change', renderAll);
+document.getElementById('yearFilter').addEventListener('change', renderAll);
+</script>
+</body>
+</html>
