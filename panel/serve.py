@@ -789,6 +789,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'coach_called_avrupa_gencler': athlete.get('coach_called_avrupa_gencler', False),
                     'candidate_relay_avrupa_gencler': athlete.get('candidate_relay_avrupa_gencler', False),
                     'avrupa_gencler_event_count': len(athlete.get('avrupa_gencler_events', [])),
+                    'multinations_events': [list(e) for e in athlete.get('multinations_events', [])],
+                    'comen_cup_events': [list(e) for e in athlete.get('comen_cup_events', [])],
+                    'central_europe_events': [list(e) for e in athlete.get('central_europe_events', [])],
+                    'multinations_gencler_events': [list(e) for e in athlete.get('multinations_gencler_events', [])],
+                    'avrupa_gencler_events': [list(e) for e in athlete.get('avrupa_gencler_events', [])],
                 })
 
             # All athletes visible (scoring applies to all age groups)
