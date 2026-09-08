@@ -1148,6 +1148,20 @@
                 athlete.selected_yildiz_central_europe_nisan ? 'Seçildi ✓' : '-';
             document.getElementById('yildiz-central-nisan-coach').textContent =
                 athlete.coach_called_yildiz_central_europe_nisan ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('genc-multi-status').textContent =
+                athlete.selected_multinations_gencler ? 'Seçildi ✓'
+                : (athlete.candidate_multinations_gencler ? 'Aday'
+                : (athlete.candidate_relay_multinations_gencler ? 'Bayrak adayı' : '-'));
+            document.getElementById('genc-multi-coach').textContent =
+                athlete.coach_called_multinations_gencler ? 'Antrenör barajı geçti' : '-';
+
+            document.getElementById('genc-avrupa-status').textContent =
+                athlete.selected_avrupa_gencler
+                    ? ('Seçildi ✓ (' + (athlete.avrupa_gencler_event_count || 0) + ' branş)')
+                    : (athlete.candidate_relay_avrupa_gencler ? 'Bayrak adayı' : '-');
+            document.getElementById('genc-avrupa-coach').textContent =
+                athlete.coach_called_avrupa_gencler ? 'Antrenör barajı geçti' : '-';
         }
 
         // Map ranking number to medal emoji or ordinal
@@ -1277,6 +1291,25 @@
             html += '<span>Nisan: <span id="yildiz-central-nisan">-</span> | ';
             html += '<span id="yildiz-central-nisan-coach">-</span></span>';
             html += '</div>';
+            html += '</div>';
+
+            html += '</div>';
+
+            // Gençler Milli Takımları section
+            html += '<div class="yildizlar-section">';
+            html += '<h3 style="margin: 0 0 15px 0; font-size: 14px; color: #333;">Gençler Milli Takımları</h3>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Multinations Gençler:</strong>';
+            html += '<span id="genc-multi-status">-</span> | ';
+            html += '<span id="genc-multi-coach">-</span>';
+            html += '</div>';
+
+            html += '<div class="yildiz-item">';
+            html += '<strong>Avrupa Gençler:</strong>';
+            html += '<span id="genc-avrupa-status">-</span> | ';
+            html += '<span id="genc-avrupa-coach">-</span>';
+            html += '<div style="font-size: 11px; color: #999;">Kısmi — yalnızca TYF Aralık/Nisan verisi</div>';
             html += '</div>';
 
             html += '</div>';

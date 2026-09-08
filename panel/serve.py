@@ -36,6 +36,7 @@ from federasyon.scorer import score_event, score_athlete_row, merge_scores, best
 from federasyon.ranker import rank_all, rank_group
 from federasyon.multinations import is_multinations
 from federasyon.yildizlar_ranker import select_all_yildizlar
+from federasyon.gencler_ranker import select_all_gencler
 from federasyon.pipeline import MiltiTakimPipeline
 from config import DB_PATH, TARGET_AGE_GROUPS, COMPETITION_YEAR
 from panel.export import create_rankings_xlsx
@@ -652,8 +653,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             # Apply yıldızlar selections on the FULL population — see note above.
             t1 = time.time()
             athletes = select_all_yildizlar(athletes)
-            timing['yildizlar'] = time.time() - t1
-            logger.info(f"API /ranking: select_all_yildizlar took {timing['yildizlar']:.2f}s")
+            athletes = select_all_gencler(athletes)
+            timing['selections'] = time.time() - t1
+            logger.info(f"API /ranking: select_all_yildizlar+gencler took {timing['selections']:.2f}s")
 
             # **Filter by leg/birth_year/region** for display only, now that
             # every selection has been computed on the full pool.
@@ -779,6 +781,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     'candidate_relay_yildiz_central_europe_nisan': athlete.get('candidate_relay_yildiz_central_europe_nisan', False),
                     'coach_called_yildiz_central_europe_aralik': athlete.get('coach_called_yildiz_central_europe_aralik', False),
                     'coach_called_yildiz_central_europe_nisan': athlete.get('coach_called_yildiz_central_europe_nisan', False),
+                    'selected_multinations_gencler': athlete.get('selected_multinations_gencler', False),
+                    'candidate_multinations_gencler': athlete.get('candidate_multinations_gencler', False),
+                    'candidate_relay_multinations_gencler': athlete.get('candidate_relay_multinations_gencler', False),
+                    'coach_called_multinations_gencler': athlete.get('coach_called_multinations_gencler', False),
+                    'selected_avrupa_gencler': athlete.get('selected_avrupa_gencler', False),
+                    'coach_called_avrupa_gencler': athlete.get('coach_called_avrupa_gencler', False),
+                    'candidate_relay_avrupa_gencler': athlete.get('candidate_relay_avrupa_gencler', False),
+                    'avrupa_gencler_event_count': len(athlete.get('avrupa_gencler_events', [])),
                 })
 
             # All athletes visible (scoring applies to all age groups)
@@ -794,7 +804,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             timing['json_response'] = time.time() - t1
 
             total_time = time.time() - start_time
-            logger.info(f"API /api/ranking TOTAL: {total_time:.2f}s | get_rankings={timing.get('get_rankings', 0):.2f}s | filter={timing.get('filter_by_leg', 0):.2f}s | selection={timing.get('selection_status', 0):.2f}s | yildizlar={timing.get('yildizlar', 0):.2f}s | json={timing.get('json_response', 0):.2f}s")
+            logger.info(f"API /api/ranking TOTAL: {total_time:.2f}s | get_rankings={timing.get('get_rankings', 0):.2f}s | filter={timing.get('filter_by_leg', 0):.2f}s | selection={timing.get('selection_status', 0):.2f}s | selections={timing.get('selections', 0):.2f}s | json={timing.get('json_response', 0):.2f}s")
 
         except Exception as e:
             logger.error(f"Error in /api/ranking: {e}", exc_info=True)
@@ -827,6 +837,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             # Yıldızlar selections on the full population, before anything
             # narrows the pool (same reasoning as serve_api_ranking()).
             athletes = select_all_yildizlar(athletes)
+            athletes = select_all_gencler(athletes)
 
             # Filter by leg
             if leg == 'antalya':
@@ -923,6 +934,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             # as /api/ranking: nationwide quotas must see every eligible
             # athlete before the leg filter shrinks the pool).
             athletes = select_all_yildizlar(athletes)
+            athletes = select_all_gencler(athletes)
 
             # Filter by leg/birth_year for display, now that every selection
             # has been computed on the full pool.
