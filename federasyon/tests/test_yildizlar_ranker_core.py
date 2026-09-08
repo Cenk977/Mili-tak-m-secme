@@ -35,3 +35,16 @@ def test_core_over_quota_trims_by_depth():
         YILDIZLAR_FEMALE_PROGRAM, YILDIZLAR_MALE_PROGRAM)
     assert len(sel) == 10
     assert "W11" in cand  # derinliksiz birinci kırpıldı
+
+
+def test_core_sets_first_events_on_winners():
+    from federasyon.yildizlar_ranker import _select_branch_winners_core, YILDIZLAR_FEMALE_PROGRAM, YILDIZLAR_MALE_PROGRAM
+    males = [
+        {"athlete_id": "M1", "athlete_name": "M1", "gender": "M", "birth_year": 2012,
+         "antalya_events_time": {("Serbest", 50): "00:00:25.00"}},
+        {"athlete_id": "M2", "athlete_name": "M2", "gender": "M", "birth_year": 2012,
+         "antalya_events_time": {("Serbest", 50): "00:00:26.00"}},
+    ]
+    _select_branch_winners_core(males, 10, "antalya_events_time",
+                                YILDIZLAR_FEMALE_PROGRAM, YILDIZLAR_MALE_PROGRAM)
+    assert ("Serbest", 50) in males[0]["_first_events"]

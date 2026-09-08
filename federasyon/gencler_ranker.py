@@ -34,17 +34,20 @@ def select_multinations_gencler(athletes):
         if aid in sel_ids:
             athlete['selected_multinations_gencler'] = True
             athlete['candidate_multinations_gencler'] = False
+            athlete['multinations_gencler_events'] = list(athlete.get('_first_events', []))
             athlete['coach_called_multinations_gencler'] = passes_any(
                 MULTI_GENCLER_ANTRENOR, athlete, 'antalya_events_time')
         elif aid in cand_ids:
             athlete['selected_multinations_gencler'] = False
             athlete['candidate_multinations_gencler'] = True
+            athlete['multinations_gencler_events'] = list(athlete.get('_first_events', []))
             athlete['coach_called_multinations_gencler'] = False
         else:
             athlete['selected_multinations_gencler'] = False
             athlete['candidate_multinations_gencler'] = False
+            athlete['multinations_gencler_events'] = []
             athlete['coach_called_multinations_gencler'] = False
-        for k in ('_first', '_second', '_third'):
+        for k in ('_first', '_second', '_third', '_first_events'):
             athlete.pop(k, None)
     return athletes
 

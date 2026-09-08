@@ -311,6 +311,7 @@ def _select_branch_winners_core(eligible, quota, event_times_key,
             a['_first'] = s['first']
             a['_second'] = s['second']
             a['_third'] = s['third']
+            a['_first_events'] = list(s.get('first_events', []))
 
     def _grp(group):
         with_first = [a for a in group if a.get('_first', 0) > 0]
@@ -393,18 +394,21 @@ def select_yildizlar_multinations(athletes):
         if aid in sel_ids:
             athlete['selected_yildiz_multinations'] = True
             athlete['candidate_yildiz_multinations'] = False
+            athlete['multinations_events'] = list(athlete.get('_first_events', []))
             passes_baraj = any(check_multi_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
                              for (s, d) in athlete.get('combined_events', {}))
             athlete['coach_called_yildiz_multinations'] = passes_baraj
         elif aid in cand_ids:
             athlete['selected_yildiz_multinations'] = False
             athlete['candidate_yildiz_multinations'] = True
+            athlete['multinations_events'] = list(athlete.get('_first_events', []))
             athlete['coach_called_yildiz_multinations'] = False
         else:
             athlete['selected_yildiz_multinations'] = False
             athlete['candidate_yildiz_multinations'] = False
+            athlete['multinations_events'] = []
             athlete['coach_called_yildiz_multinations'] = False
-        for k in ['_first', '_second', '_third']:
+        for k in ['_first', '_second', '_third', '_first_events']:
             athlete.pop(k, None)
 
     return athletes
@@ -468,11 +472,15 @@ def select_yildizlar_comen_cup_aralik(athletes):
         athlete['candidate_relay_yildiz_comen_cup_aralik'] = athlete['athlete_id'] in relay_cand_ids
         if athlete['athlete_id'] in sel_ids:
             athlete['selected_yildiz_comen_cup_aralik'] = True
+            athlete['comen_cup_events'] = sorted(
+                set(athlete.get('comen_cup_events', [])) | set(athlete.get('_first_events', []))
+            )
             passes_baraj = any(check_comen_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
                              for (s, d) in athlete.get('combined_events', {}))
             athlete['coach_called_yildiz_comen_cup_aralik'] = passes_baraj
         else:
             athlete['selected_yildiz_comen_cup_aralik'] = False
+            athlete.setdefault('comen_cup_events', [])
             athlete['coach_called_yildiz_comen_cup_aralik'] = False
         for k in ['_first_events', '_first_count']:
             athlete.pop(k, None)
@@ -525,11 +533,15 @@ def select_yildizlar_comen_cup_nisan(athletes):
         athlete['candidate_relay_yildiz_comen_cup_nisan'] = athlete['athlete_id'] in relay_cand_ids
         if athlete['athlete_id'] in sel_ids:
             athlete['selected_yildiz_comen_cup_nisan'] = True
+            athlete['comen_cup_events'] = sorted(
+                set(athlete.get('comen_cup_events', [])) | set(athlete.get('_first_events', []))
+            )
             passes_baraj = any(check_comen_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
                              for (s, d) in athlete.get('combined_events', {}))
             athlete['coach_called_yildiz_comen_cup_nisan'] = passes_baraj
         else:
             athlete['selected_yildiz_comen_cup_nisan'] = False
+            athlete.setdefault('comen_cup_events', [])
             athlete['coach_called_yildiz_comen_cup_nisan'] = False
         for k in ['_first_events', '_first_count']:
             athlete.pop(k, None)
@@ -604,16 +616,21 @@ def select_yildizlar_central_europe_aralik(athletes):
         if aid in sel_ids:
             athlete['selected_yildiz_central_europe_aralik'] = True
             athlete['candidate_yildiz_central_europe_aralik'] = False
+            athlete['central_europe_events'] = sorted(
+                set(athlete.get('central_europe_events', [])) | set(athlete.get('_first_events', []))
+            )
             passes_baraj = any(check_central_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
                              for (s, d) in athlete.get('combined_events', {}))
             athlete['coach_called_yildiz_central_europe_aralik'] = passes_baraj
         elif aid in cand_ids:
             athlete['selected_yildiz_central_europe_aralik'] = False
             athlete['candidate_yildiz_central_europe_aralik'] = True
+            athlete.setdefault('central_europe_events', [])
             athlete['coach_called_yildiz_central_europe_aralik'] = False
         else:
             athlete['selected_yildiz_central_europe_aralik'] = False
             athlete['candidate_yildiz_central_europe_aralik'] = False
+            athlete.setdefault('central_europe_events', [])
             athlete['coach_called_yildiz_central_europe_aralik'] = False
         for k in ['_first_events', '_first', '_second', '_third']:
             athlete.pop(k, None)
@@ -675,16 +692,21 @@ def select_yildizlar_central_europe_nisan(athletes):
         if aid in sel_ids:
             athlete['selected_yildiz_central_europe_nisan'] = True
             athlete['candidate_yildiz_central_europe_nisan'] = False
+            athlete['central_europe_events'] = sorted(
+                set(athlete.get('central_europe_events', [])) | set(athlete.get('_first_events', []))
+            )
             passes_baraj = any(check_central_baraj(s, d, athlete['gender'], athlete.get('combined_events_time', {}).get((s, d), '99:99'))
                              for (s, d) in athlete.get('combined_events', {}))
             athlete['coach_called_yildiz_central_europe_nisan'] = passes_baraj
         elif aid in cand_ids:
             athlete['selected_yildiz_central_europe_nisan'] = False
             athlete['candidate_yildiz_central_europe_nisan'] = True
+            athlete.setdefault('central_europe_events', [])
             athlete['coach_called_yildiz_central_europe_nisan'] = False
         else:
             athlete['selected_yildiz_central_europe_nisan'] = False
             athlete['candidate_yildiz_central_europe_nisan'] = False
+            athlete.setdefault('central_europe_events', [])
             athlete['coach_called_yildiz_central_europe_nisan'] = False
         for k in ['_first_events', '_first', '_second', '_third']:
             athlete.pop(k, None)
