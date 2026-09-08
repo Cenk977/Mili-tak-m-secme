@@ -294,6 +294,40 @@ def count_first_places(athlete_id: int, eligible_athletes: list, event_times_key
 MULTINATIONS_QUOTA = 10
 
 
+def _select_branch_winners_core(eligible, quota, event_times_key,
+                                female_program, male_program,
+                                relay_events=RELAY_LEG_EVENTS):
+    """Branş-birinciliği tabanlı seçim çekirdeği (Multi Yıldızlar + Multi
+    Gençler ortak). eligible: tek yaş-grubu-filtreli sporcu listesi.
+    Döner: (selected_ids, candidate_ids, relay_candidate_ids).
+    Yan etki: eligible sporculara _first/_second/_third eklenir."""
+    females = [a for a in eligible if a.get('gender') == 'F']
+    males = [a for a in eligible if a.get('gender') == 'M']
+
+    for glist, prog in ((females, female_program), (males, male_program)):
+        stats = _compute_group_stats(glist, event_times_key, prog)
+        for a in glist:
+            s = stats.get(a.get('athlete_id'), {'first': 0, 'second': 0, 'third': 0})
+            a['_first'] = s['first']
+            a['_second'] = s['second']
+            a['_third'] = s['third']
+
+    def _grp(group):
+        with_first = [a for a in group if a.get('_first', 0) > 0]
+        without_first = [a for a in group if a.get('_first', 0) == 0]
+        return _split_winners_by_quota(with_first, without_first, quota)
+
+    sel_f, cand_f = _grp(females)
+    sel_m, cand_m = _grp(males)
+    sel_ids = {a.get('athlete_id') for a in sel_f + sel_m}
+    cand_ids = {a.get('athlete_id') for a in cand_f + cand_m}
+    relay_ids = (
+        _relay_candidate_ids(females, event_times_key, sel_ids, relay_events) |
+        _relay_candidate_ids(males, event_times_key, sel_ids, relay_events)
+    )
+    return sel_ids, cand_ids, relay_ids
+
+
 def _split_winners_by_quota(with_first, without_first, quota):
     """Multinations / Central European kota mantığı (PDF madde 4 + 5).
 
@@ -349,34 +383,9 @@ def select_yildizlar_multinations(athletes):
     the men's squad at 8 real winners rather than padding to 10.
     """
     eligible = [a for a in athletes if 2011 <= a.get('birth_year') <= 2013]
-    females = [a for a in eligible if a.get('gender') == 'F']
-    males = [a for a in eligible if a.get('gender') == 'M']
-
-    programs = {'F': YILDIZLAR_FEMALE_PROGRAM, 'M': YILDIZLAR_MALE_PROGRAM}
-    for gender, athlete_list in [('F', females), ('M', males)]:
-        stats = _compute_group_stats(athlete_list, 'antalya_events_time', programs[gender])
-        for athlete in athlete_list:
-            s = stats.get(athlete.get('athlete_id'), {'first': 0, 'second': 0, 'third': 0})
-            athlete['_first'] = s['first']
-            athlete['_second'] = s['second']
-            athlete['_third'] = s['third']
-
-    def select_group(group):
-        with_first = [a for a in group if a.get('_first', 0) > 0]
-        without_first = [a for a in group if a.get('_first', 0) == 0]
-        return _split_winners_by_quota(with_first, without_first, MULTINATIONS_QUOTA)
-
-    sel_f, cand_f = select_group(females)
-    sel_m, cand_m = select_group(males)
-    sel_ids = {a.get('athlete_id') for a in sel_f + sel_m}
-    cand_ids = {a.get('athlete_id') for a in cand_f + cand_m}
-
-    # Relay-leg depth candidates: independent of quota fill — an athlete can
-    # be relay-valuable (top-N over 100m/200m) even when the individual-win
-    # quota is already full of OTHER athletes. See RELAY_LEG_EVENTS docstring.
-    relay_cand_f = _relay_candidate_ids(females, 'antalya_events_time', sel_ids)
-    relay_cand_m = _relay_candidate_ids(males, 'antalya_events_time', sel_ids)
-    relay_cand_ids = relay_cand_f | relay_cand_m
+    sel_ids, cand_ids, relay_cand_ids = _select_branch_winners_core(
+        eligible, MULTINATIONS_QUOTA, 'antalya_events_time',
+        YILDIZLAR_FEMALE_PROGRAM, YILDIZLAR_MALE_PROGRAM)
 
     for athlete in athletes:
         aid = athlete.get('athlete_id')
