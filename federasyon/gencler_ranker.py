@@ -47,3 +47,44 @@ def select_multinations_gencler(athletes):
         for k in ('_first', '_second', '_third'):
             athlete.pop(k, None)
     return athletes
+
+
+def select_avrupa_gencler(athletes):
+    """Avrupa Gençler (2008-2012): kendi branş/mesafesindeki SPORCU BARAJI'nı
+    (eşit dahil) geçen her sporcu kesin. Kota yok. Veri: combined_events_time
+    (geniş pencere → en iyi derece; elimizde yalnız Aralık+Nisan → kısmi)."""
+    lo, hi = AVRUPA_GENCLER_AGES
+    for athlete in athletes:
+        by = athlete.get('birth_year')
+        in_age = by is not None and lo <= by <= hi
+        gender = athlete.get('gender')
+        ets = athlete.get('combined_events_time', {})
+        qual, coach = [], False
+        if in_age:
+            for (s, d) in athlete.get('combined_events', {}):
+                t = ets.get((s, d))
+                if check_baraj(AVRUPA_GENCLER_SPORCU, s, d, gender, t):
+                    qual.append((s, d))
+                if check_baraj(AVRUPA_GENCLER_ANTRENOR, s, d, gender, t):
+                    coach = True
+        athlete['avrupa_gencler_events'] = qual
+        athlete['selected_avrupa_gencler'] = len(qual) > 0
+        athlete['coach_called_avrupa_gencler'] = coach
+
+    elig = [a for a in athletes
+            if a.get('birth_year') is not None and lo <= a['birth_year'] <= hi]
+    sel_ids = {a['athlete_id'] for a in elig if a['selected_avrupa_gencler']}
+    fem = [a for a in elig if a.get('gender') == 'F']
+    mal = [a for a in elig if a.get('gender') == 'M']
+    relay_ids = (_relay_candidate_ids(fem, 'combined_events_time', sel_ids) |
+                 _relay_candidate_ids(mal, 'combined_events_time', sel_ids))
+    for athlete in athletes:
+        athlete['candidate_relay_avrupa_gencler'] = athlete.get('athlete_id') in relay_ids
+    return athletes
+
+
+def select_all_gencler(athletes):
+    """Tüm Gençler seçimlerini uygula (additive)."""
+    athletes = select_multinations_gencler(athletes)
+    athletes = select_avrupa_gencler(athletes)
+    return athletes
