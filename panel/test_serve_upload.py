@@ -633,5 +633,21 @@ def test_api_ranking_includes_gencler_fields():
     assert isinstance(out[0]["avrupa_gencler_events"], list)
 
 
+def test_api_ranking_serializes_secim_events():
+    from federasyon.yildizlar_ranker import select_yildizlar_multinations
+    ath = [{
+        "athlete_id": "e1", "athlete_name": "E1", "gender": "M", "birth_year": 2012,
+        "antalya_events_time": {("Serbest", 50): "00:00:24.00"},
+        "antalya_events": {("Serbest", 50): 1},
+        "combined_events": {("Serbest", 50): 1}, "combined_events_time": {("Serbest", 50): "00:00:24.00"},
+    }]
+    out = select_yildizlar_multinations(ath)
+    # backend alanı tuple listesi
+    assert out[0]["multinations_events"] == [("Serbest", 50)]
+    # serve.py serileştirme kalıbı (list-of-list)
+    serialized = [list(e) for e in out[0].get("multinations_events", [])]
+    assert serialized == [["Serbest", 50]]
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
