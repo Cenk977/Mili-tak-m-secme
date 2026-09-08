@@ -30,6 +30,9 @@ def test_multinations_events_populated_for_winner_empty_for_loser():
     by = {a["athlete_id"]: a for a in out}
     assert set(by["W"]["multinations_events"]) == {("Serbest", 50), ("Kelebek", 100)}
     assert by["L"]["multinations_events"] == []
+    # pop-hygiene: internal scratch key must not leak into returned dicts
+    assert '_first_events' not in by["W"]
+    assert '_first_events' not in by["L"]
 
 
 def test_multinations_events_only_swum_events():
@@ -59,6 +62,7 @@ def test_comen_events_union_of_aralik_and_nisan_wins():
     by = {a["athlete_id"]: a for a in ath}
     assert set(by["W"]["comen_cup_events"]) == {("Serbest", 50), ("Kelebek", 100)}
     assert by["O"]["comen_cup_events"] == []
+    assert '_first_events' not in by["W"]
 
 
 def test_central_quota_trimmed_candidate_keeps_won_events():
@@ -92,3 +96,4 @@ def test_central_events_populated():
     by = {a["athlete_id"]: a for a in ath}
     assert ("Sırtüstü", 200) in by["W"]["central_europe_events"]
     assert by["O"]["central_europe_events"] == []
+    assert '_first_events' not in by["W"]
