@@ -1547,15 +1547,18 @@
                 return `
                     <div class="athlete-row" data-athlete-name="${athlete.athlete_name.replace(/"/g, '&quot;')}" data-ranking="${ranking}" onclick="toggleDetailRow(this.dataset.athleteName)" style="cursor: pointer;">
                         <div class="col-badge">${badge}</div>
-                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px;">
-                            <div class="col-name" style="margin: 0;"><span style="color: #667eea; font-weight: 600; margin-right: 6px;">${rankingDisplay}</span>${athlete.athlete_name}</div>
-                            <div class="col-info" style="margin: 0;">${athlete.city} (${athlete.club})</div>
+                        <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 1px 8px;">
+                                <span style="color: #667eea; font-weight: 600;">${rankingDisplay}</span>
+                                <span class="col-name" style="margin: 0;">${athlete.athlete_name}</span>
+                                <span class="col-info" style="margin: 0;">${athlete.city} (${athlete.club})</span>
+                                <span class="age-gender" style="font-size: 12px;">${age} ${genderText}</span>
+                            </div>
                             <div class="col-stats" style="margin: 0;">
                                 <span class="points"><strong>${points > 0 ? points : '-'}</strong></span>
                                 <span class="selection-badge" data-status="${badgeStatus}">
                                     ${athlete.selected_slot || '-'}
                                 </span>
-                                <span class="age-gender">${age} ${genderText}</span>
                                 ${multinationsSelected ? '<span style="display: inline-block; margin-left: 6px; background: #c2185b; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">MULTI</span>' : ''}${multinationsCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #c2185b; border: 1px solid #c2185b; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="Federasyon takdirine bağlı aday - 2./3.lük ile kota tamamlama">MULTI-ADAY</span>' : ''}${multinationsRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #00838f; border: 1px dashed #00838f; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="100m/200m branşlarda üst sıra - bayrak takımı için değerlendirilebilir">BAYRAK ADAYI</span>' : ''}
                                 ${comenCupSelected ? '<span style="display: inline-block; margin-left: 4px; background: #1976d2; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">COMEN</span>' : ''}
                                 ${centralSelected ? '<span style="display: inline-block; margin-left: 4px; background: #388e3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">CENTRAL</span>' : ''}${centralCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #388e3c; border: 1px solid #388e3c; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="Federasyon takdirine bağlı aday - kota tamamlama">CENTRAL-ADAY</span>' : ''}${centralRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #00838f; border: 1px dashed #00838f; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="100m/200m branşlarda üst sıra - bayrak takımı için değerlendirilebilir">BAYRAK ADAYI</span>' : ''}${comenRelayCandidate ? '<span style="display: inline-block; margin-left: 4px; background: transparent; color: #1976d2; border: 1px dashed #1976d2; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;" title="50m/100m/200m branşlarda üst sıra - Comen Cup bayrak takımı için değerlendirilebilir">COMEN-BAYRAK</span>' : ''}

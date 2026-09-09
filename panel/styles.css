@@ -195,7 +195,8 @@ body {
 
 .col-stats {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   align-items: center;
   font-size: 13px;
 }
