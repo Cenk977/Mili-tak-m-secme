@@ -156,6 +156,7 @@ def main():
 
     shutil.copy(PANEL_DIR / "index.html", OUT_DIR / "index.html")
     shutil.copy(PANEL_DIR / "secilenler.html", OUT_DIR / "secilenler.html")
+    shutil.copy(PANEL_DIR / "auth-gate.js", OUT_DIR / "auth-gate.js")
     styles_src = PANEL_DIR / "styles.css"
     if styles_src.exists():
         shutil.copy(styles_src, OUT_DIR / "styles.css")
