@@ -107,3 +107,27 @@ ve `== kota` davranışı değişmedi. Comen'de kota yok, dokunulmadı.
 Not: Eşitlikte sınırdaki kişi(ler) — şu an tam kotaya kesiliyor (kararlı
 sıralama, giriş sırası korunur). Federasyonun eşitlik davranışı belirsiz;
 kullanıcı bir sorun bildirirse "tied-keep" eklenebilir.
+
+## 2026-09-09 — Bölge kotasında "1. sıra beraberliği" incelemesi: KURAL DEĞİL, TAKDİR
+
+Kullanıcı 3 grupta federasyonun kotayı aştığını fark etti; olası kural:
+"bölgenin 1. sırasındaki eşit-puanlı grup tek kontenjan sayılır, sonrası
+normal". Bu hipotez 3 vakaya tam uyuyor:
+
+| Grup | Kota | 1. sıra | Federasyon | Bizim kod |
+|------|------|---------|-----------|-----------|
+| 2012E B4 | 2 | {Doruk 23, Tan 23} | 3 (Umut 20 eklendi) | 2 |
+| 2013K B6 | 3 | {Yağmur 23, Hatice 23} | 4 (Elif Durum 21 + Ömür Güvel 20) | 3 |
+| 2013E B1 | 6 | {Ayaz, Ö.Cengiz, M.Uludağ = 25} | 8 (M.M.Kıraç 24 + Efe Ertürk 23 + Rüzgar 22 + Burak K. 21 + Levent Y. 21) | 6 |
+
+**AMA kural DEĞİL** — kullanıcı karşı örnek buldu, aynı yapı zıt karar:
+
+| Grup | Kota | 1. sıra | Federasyon | Bizim kod |
+|------|------|---------|-----------|-----------|
+| 2012E B6 | 2 | {Doruk Kervancıoğlu 19, Aydın Ege Özsoy 19} (birebir aynı key) | 2 (3.'yü almadı) | 2 ✓ |
+| 2012E B5 | 2 | {Eymen Bera Ayas 11, Aras Ipek 11} | 2 (3.'yü almadı) | 2 ✓ |
+
+B6/B5'te kurala sıkı uymuş, B4/B6-2013K/B1'de kotayı aşıp fazladan almış.
+Kodlanabilir örüntü yok → **federasyon takdiri**. `_select_with_tie`
+DEĞİŞMEYECEK; mevcut hali kural açısından doğru. Bu 5 vaka "Soru 2"
+(federasyon kota-üstü takdiri) sınıfına ait — Ankara 2013E B4 gibi.
