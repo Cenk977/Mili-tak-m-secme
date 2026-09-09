@@ -187,19 +187,31 @@ function evChips(events) {
 }
 
 // Fed Karması puan bazlı — "karar veren yarışlar" = en yüksek puanlı ilk 3 branş.
+// Fed Karması "karar veren 3 yarış" — federasyon.scorer.best_scores_sequence
+// ile aynı mantık: en yüksek 3 puan, İÇİNDE EN FAZLA 1 ADET 50m.
 function top3PointChips(a) {
   const ce = a.combined_events;
   if (!ce || typeof ce !== 'object') return '';
-  const rows = [];
+  const races = [];
   for (const key in ce) {
     let stroke, dist;
     try { [stroke, dist] = JSON.parse(key); } catch (_) { continue; }
     const v = ce[key];
     const pts = (v && typeof v === 'object') ? (v.points || 0) : (v || 0);
-    if (pts > 0) rows.push({ stroke, dist, pts });
+    if (pts > 0) races.push({ stroke, dist, pts });
   }
-  rows.sort((x, y) => y.pts - x.pts);
-  return rows.slice(0, 3).map(r =>
+  const fifties = races.filter(r => r.dist === 50).sort((x, y) => y.pts - x.pts);
+  const nonF    = races.filter(r => r.dist !== 50).sort((x, y) => y.pts - x.pts);
+  const top3 = [];
+  let usedFifty = false, ni = 0;
+  while (top3.length < 3) {
+    const f  = (!usedFifty && fifties.length) ? fifties[0] : null;
+    const nf = ni < nonF.length ? nonF[ni] : null;
+    if (!f && !nf) break;
+    if (f && (!nf || f.pts > nf.pts)) { top3.push(f); usedFifty = true; }
+    else { top3.push(nf); ni++; }
+  }
+  return top3.map(r =>
     '<span class="ev">🏅 ' + esc(r.stroke) + ' ' + esc(r.dist) + ' (' + r.pts + ')</span>').join('');
 }
 
