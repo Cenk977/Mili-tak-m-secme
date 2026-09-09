@@ -162,8 +162,8 @@ body {
   display: grid;
   grid-template-columns: 60px 1fr 100px 60px;
   gap: 15px;
-  padding: 10px 12px;
-  align-items: flex-start;
+  padding: 6px 12px;
+  align-items: center;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-row);
   cursor: pointer;
