@@ -1256,13 +1256,11 @@
             };
             const selStatus = athlete.selected || '-';
             html += '<div style="display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin-bottom: 14px; padding: 8px 10px; background: white; border-radius: 4px; border-left: 3px solid #667eea; font-size: 13px;">';
-            html += '<span><strong style="font-size: 12px; color: #666;">Seçim:</strong> <span style="background: ' + (selectionColor[selStatus] || '#f5f5f5') + '; padding: 2px 8px; border-radius: 3px; font-weight: 600;">' + selStatus + '</span></span>';
+            html += '<span><strong style="font-size: 12px; color: #666;">Federasyon Karması:</strong> <span style="background: ' + (selectionColor[selStatus] || '#f5f5f5') + '; padding: 2px 8px; border-radius: 3px; font-weight: 600;">' + selStatus + '</span></span>';
             if (athlete.selected_slot && athlete.selected_slot !== '-') {
                 html += '<span><strong style="font-size: 12px; color: #666;">Seçim Sırası:</strong> ' + athlete.selected_slot + '</span>';
             }
-            if (athlete.multinations) {
-                html += '<span style="background: #fce4ec; padding: 2px 8px; border-radius: 3px; color: #c2185b; font-weight: 600;">⭐ Multinations</span>';
-            }
+            html += '<span style="font-size: 11px; color: #999;">Milli takımlar için aşağıdaki bölümlere bakın →</span>';
             html += '</div>';
 
             // Yıldızlar + Gençler Milli Takımları — yana yana
